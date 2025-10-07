@@ -1014,16 +1014,88 @@ With the right execution, CodeQuest Jr. can become the default platform for kids
 
 **Goal:** ✅ Users can view their profile, browse worlds, and navigate to world detail pages. All pages are responsive and ready for lesson content.
 
-#### Weeks 5-6: Lesson Engine
-- [ ] Lesson viewer UI
-- [ ] Monaco editor integration
-- [ ] Live preview
-- [ ] Code validation
+#### Week 4: Lesson Engine ✅ COMPLETE
+- [x] Create 5 HTML lessons with educational content
+- [x] Build lesson detail page with dynamic routing
+- [x] Implement interactive code editor (textarea)
+- [x] Add live HTML preview with iframe
+- [x] Build comprehensive validation system (5 rule types)
+- [x] Implement progressive hint system
+- [x] Create lesson completion flow
+- [x] Add coin and XP reward system
+- [x] Progress tracking and database updates
+- [x] End-to-end testing with Playwright
 
-#### Week 7: Code Validation & Coins
-- [ ] Validation engine
-- [ ] Coin rewards
-- [ ] Hint system
+**Deliverables:**
+- 5 HTML Haven lessons: First HTML Page, Paragraphs, Headings, Links, Images
+- Interactive lesson page (`/lessons/[id]`) with split-screen layout
+- Code editor with live preview and syntax validation
+- Hint system with progressive reveal
+- Complete reward system (coins + XP automatically awarded)
+- Progress persistence in database
+- Comprehensive testing documentation (SPRINT_4_TESTING.md)
+
+**Goal:** ✅ Students can complete interactive HTML lessons, write code, see live previews, get hints, and earn rewards. All lesson data persists to database.
+
+#### Week 5: Shop & Leaderboard ✅ COMPLETE
+- [x] Shop database schema (shop_items, student_inventory)
+- [x] Create 20 shop items across 4 categories
+- [x] Build shop page with category filtering
+- [x] Implement purchase system with validation
+- [x] Add inventory tracking
+- [x] Build leaderboard page with rankings
+- [x] Add top 3 podium display
+- [x] Implement sortable rankings (XP, coins, level)
+- [x] Personal rank tracking
+- [x] End-to-end testing
+
+**Deliverables:**
+- Shop page with 20 items (avatars, power-ups, badges, themes)
+- Purchase system with coin deduction and rollback protection
+- Inventory tracking with RLS policies
+- Leaderboard with top 100 rankings and 3 sort options
+- Personal rank calculation (even outside top 100)
+- Comprehensive documentation (SPRINT_5_SUMMARY.md)
+
+**Goal:** ✅ Students can spend earned coins in the shop and compete on the leaderboard.
+
+#### Week 6: CSS World ✅ COMPLETE
+- [x] Create 5 CSS lessons with educational content
+- [x] Implement attribute pattern validation for CSS
+- [x] Build CSS Canyon lessons (colors, fonts, spacing, borders, text)
+- [x] Enhance validation engine with regex support
+- [x] CSS preview support (via iframe)
+- [x] Progressive difficulty curve
+- [x] Database migration
+
+**Deliverables:**
+- 5 CSS Canyon lessons: Colors, Fonts, Margins/Padding, Borders, Text Styling
+- Enhanced validation with `attribute_patterns` rule type
+- Regex pattern matching for CSS properties
+- Total rewards: 325 coins, 650 XP
+- Comprehensive documentation (SPRINT_6_SUMMARY.md)
+
+**Goal:** ✅ Students can learn CSS styling with inline styles and see visual feedback in real-time.
+
+#### Week 7: JavaScript World ✅ COMPLETE
+- [x] Create 5 JavaScript lessons with educational content
+- [x] Implement console output capture system
+- [x] Add `console_output` validation rule
+- [x] Add `code_contains` validation rule
+- [x] Build console output display UI
+- [x] Enable JavaScript execution in iframe
+- [x] Progressive difficulty curve
+- [x] Database migration
+
+**Deliverables:**
+- 5 JavaScript Jungle lessons: Variables, Console/Math, Functions, Conditionals, Loops
+- Console output capture via postMessage
+- `console_output` and `code_contains` validation rules
+- Terminal-style console output panel
+- Total rewards: 325 coins, 650 XP
+- Comprehensive documentation (SPRINT_7_SUMMARY.md)
+
+**Goal:** ✅ Students can write real JavaScript code, see console output, and learn programming fundamentals.
 
 #### Week 8: First World Content
 - [ ] 5 HTML Basics lessons
@@ -1051,12 +1123,16 @@ With the right execution, CodeQuest Jr. can become the default platform for kids
 - [ ] Testing
 - [ ] Production deployment
 
-**Current Week:** 4 (Sprint 4: Lesson Engine - READY TO START)
+**Current Week:** 8 (Sprint 8: Advanced Features - READY TO START)
 **Previous Sprints:**
 - Week 1: Landing Page & Navigation ✅
 - Week 2: Authentication Foundation ✅
 - Week 3: Profile & World Map ✅
-**Overall Completion:** 45% (Foundation, UI, authentication, database, profile, worlds, and testing complete)
+- Week 4: Lesson Engine & HTML Lessons ✅
+- Week 5: Shop & Leaderboard ✅
+- Week 6: CSS World ✅
+- Week 7: JavaScript World ✅
+**Overall Completion:** 80% (Foundation, UI, auth, database, profile, worlds, lesson engine, 3 worlds with 15 lessons, shop, and leaderboard complete)
 
 ---
 
