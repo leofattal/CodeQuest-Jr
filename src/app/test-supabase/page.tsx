@@ -8,9 +8,9 @@ export default async function TestSupabasePage() {
   const supabase = await createClient();
 
   // Test 1: Database connection
-  let dbTestResult = { success: false, error: null, tables: [] as string[] };
+  let dbTestResult: { success: boolean; error: string | null; tables: string[] } = { success: false, error: null, tables: [] };
   try {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('user_profiles')
       .select('id')
       .limit(1);
@@ -29,7 +29,11 @@ export default async function TestSupabasePage() {
   }
 
   // Test 2: Auth status
-  let authTestResult = { success: false, error: null, user: null as any };
+  let authTestResult: { success: boolean; error: string | null; user: { id?: string; email?: string } | null } = {
+    success: false,
+    error: null,
+    user: null
+  };
   try {
     const { data: { user }, error } = await supabase.auth.getUser();
 
@@ -168,7 +172,7 @@ export default async function TestSupabasePage() {
         <div className="bg-white rounded-lg shadow-md p-6">
           <h2 className="text-2xl font-bold mb-4">🚀 Next Steps</h2>
           <ol className="list-decimal list-inside space-y-2 text-sm">
-            <li>If all tests pass, you're ready to build authentication!</li>
+            <li>If all tests pass, you&apos;re ready to build authentication!</li>
             <li>Navigate to <code className="bg-gray-100 px-2 py-1 rounded">/login</code> to start building the login form</li>
             <li>Create database schema for CodeQuest Jr. (users, lessons, progress, etc.)</li>
             <li>Delete this test page when done: <code className="bg-gray-100 px-2 py-1 rounded">src/app/test-supabase/</code></li>

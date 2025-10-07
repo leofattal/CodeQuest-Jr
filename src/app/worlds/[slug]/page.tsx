@@ -6,7 +6,7 @@ import { PageTransition } from "@/components/common/PageTransition";
 import { createClient } from "@/lib/supabase/client";
 import { ArrowLeft, Lock, Play, CheckCircle, Star, Clock } from "lucide-react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 
 interface World {
   id: string;
@@ -42,8 +42,7 @@ interface Progress {
  */
 export default function WorldDetailPage() {
   const params = useParams();
-  const router = useRouter();
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const [world, setWorld] = useState<World | null>(null);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [progress, setProgress] = useState<Progress[]>([]);

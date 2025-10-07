@@ -14,7 +14,7 @@ import {
   Coins as CoinsIcon
 } from "lucide-react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 
 interface Lesson {
   id: string;
@@ -59,7 +59,6 @@ interface World {
  */
 export default function LessonPage() {
   const params = useParams();
-  const router = useRouter();
   const { user } = useAuth();
   const [lesson, setLesson] = useState<Lesson | null>(null);
   const [world, setWorld] = useState<World | null>(null);
@@ -567,7 +566,7 @@ export default function LessonPage() {
               {/* Learning Objectives */}
               {lesson.content.learning_objectives && lesson.content.learning_objectives.length > 0 && (
                 <div className="bg-background rounded-xl p-6 border border-border">
-                  <h2 className="text-xl font-bold mb-3">What You'll Learn</h2>
+                  <h2 className="text-xl font-bold mb-3">What You&apos;ll Learn</h2>
                   <ul className="space-y-2">
                     {lesson.content.learning_objectives.map((objective, index) => (
                       <li key={index} className="flex items-start gap-2">

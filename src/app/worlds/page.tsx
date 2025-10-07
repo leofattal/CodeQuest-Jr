@@ -79,11 +79,10 @@ export default function WorldsPage() {
 
           {/* World Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {worlds.map((world, index) => (
+            {worlds.map((world) => (
               <WorldCard
                 key={world.id}
                 world={world}
-                index={index}
               />
             ))}
           </div>
@@ -121,7 +120,7 @@ export default function WorldsPage() {
   );
 }
 
-function WorldCard({ world, index }: { world: World; index: number }) {
+function WorldCard({ world }: { world: World }) {
   // Parse color for gradient
   const gradientClass = world.color.includes("from-")
     ? world.color

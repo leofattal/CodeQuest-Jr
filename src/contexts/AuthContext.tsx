@@ -63,16 +63,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setProfile(data);
       setLoading(false); // Profile loaded successfully
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Better error logging
-      if (error?.code === 'PGRST116') {
+      const err = error as { code?: string; message?: string; details?: string; hint?: string };
+      if (err?.code === 'PGRST116') {
         console.warn(`Profile not found for user ${userId} after ${retryCount + 1} attempts`);
       } else {
         console.error("Error fetching profile:", {
-          message: error?.message,
-          code: error?.code,
-          details: error?.details,
-          hint: error?.hint
+          message: err?.message,
+          code: err?.code,
+          details: err?.details,
+          hint: err?.hint
         });
       }
 
@@ -121,14 +122,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, []); // Empty deps is intentional - only run on mount
 
   /**
    * Sign up with email and password
    */
   const signUp = async (email: string, password: string, displayName: string) => {
     try {
-      const { data, error } = await supabase.auth.signUp({
+      const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {

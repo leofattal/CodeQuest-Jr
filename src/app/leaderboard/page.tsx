@@ -6,8 +6,6 @@ import { PageTransition } from "@/components/common/PageTransition";
 import { createClient } from "@/lib/supabase/client";
 import {
   Trophy,
-  Medal,
-  Award,
   Coins,
   Zap,
   TrendingUp
