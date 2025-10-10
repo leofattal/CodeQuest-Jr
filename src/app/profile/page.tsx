@@ -2,6 +2,7 @@
 
 import { useAuth } from "@/contexts/AuthContext";
 import { PageTransition } from "@/components/common/PageTransition";
+import { BadgesPanel } from "@/components/profile/BadgesPanel";
 import {
   User,
   Coins,
@@ -141,47 +142,8 @@ export default function ProfilePage() {
             />
           </div>
 
-          {/* Badges & Achievements */}
-          <div className="bg-muted/30 rounded-2xl p-6 border border-border">
-            <div className="flex items-center gap-3 mb-6">
-              <Award className="w-6 h-6 text-primary" />
-              <h2 className="text-2xl font-bold">Achievements</h2>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-              {/* Example badges - these would come from the database */}
-              <BadgeCard
-                icon="🎯"
-                title="First Step"
-                description="Complete your first lesson"
-                locked={true}
-              />
-              <BadgeCard
-                icon="🏆"
-                title="HTML Hero"
-                description="Complete HTML Basics world"
-                locked={true}
-              />
-              <BadgeCard
-                icon="🎨"
-                title="Style Master"
-                description="Complete CSS Styling world"
-                locked={true}
-              />
-              <BadgeCard
-                icon="⚡"
-                title="JS Wizard"
-                description="Complete JS Fundamentals"
-                locked={true}
-              />
-              <BadgeCard
-                icon="💰"
-                title="Rich Kid"
-                description="Earn 1,000 coins"
-                locked={true}
-              />
-            </div>
-          </div>
+          {/* Badges Panel */}
+          {user && <BadgesPanel userId={user.id} />}
 
           {/* Skills Overview */}
           <div className="bg-muted/30 rounded-2xl p-6 border border-border">

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Coins, User, Menu, X, LogOut } from "lucide-react";
+import { Coins, User, Menu, X, LogOut, Trophy, Star } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
@@ -62,14 +62,26 @@ export function Header() {
             </Link>
           </div>
 
-          {/* Right side: Coins & Profile */}
-          <div className="hidden md:flex items-center space-x-4">
+          {/* Right side: Stats & Profile */}
+          <div className="hidden md:flex items-center space-x-3">
             {isLoggedIn ? (
               <>
-                {/* Coin Counter */}
-                <div className="flex items-center space-x-2 bg-accent/20 px-4 py-2 rounded-full border border-accent/30">
-                  <Coins className="w-5 h-5 text-accent" />
-                  <span className="font-bold text-accent-foreground">{userCoins}</span>
+                {/* Level */}
+                <div className="flex items-center space-x-1.5 bg-purple-500/20 px-3 py-1.5 rounded-full border border-purple-500/30">
+                  <Star className="w-4 h-4 text-purple-500" />
+                  <span className="text-sm font-bold text-purple-700 dark:text-purple-300">Lv {profile?.level ?? 1}</span>
+                </div>
+
+                {/* XP */}
+                <div className="flex items-center space-x-1.5 bg-blue-500/20 px-3 py-1.5 rounded-full border border-blue-500/30">
+                  <Trophy className="w-4 h-4 text-blue-500" />
+                  <span className="text-sm font-bold text-blue-700 dark:text-blue-300">{profile?.xp ?? 0} XP</span>
+                </div>
+
+                {/* Coins */}
+                <div className="flex items-center space-x-1.5 bg-yellow-500/20 px-3 py-1.5 rounded-full border border-yellow-500/30">
+                  <Coins className="w-4 h-4 text-yellow-600 dark:text-yellow-500" />
+                  <span className="text-sm font-bold text-yellow-700 dark:text-yellow-300">{userCoins}</span>
                 </div>
 
                 {/* Profile Dropdown */}
@@ -149,11 +161,32 @@ export function Header() {
         {mobileMenuOpen && (
           <div className="md:hidden py-4 space-y-4 border-t border-border animate-in slide-in-from-top">
             {isLoggedIn && (
-              <div className="flex items-center justify-between px-2 py-2 bg-accent/20 rounded-lg">
-                <span className="text-sm font-medium">Your Coins</span>
-                <div className="flex items-center space-x-2">
-                  <Coins className="w-4 h-4 text-accent" />
-                  <span className="font-bold text-accent-foreground">{userCoins}</span>
+              <div className="space-y-2 px-2">
+                {/* Level */}
+                <div className="flex items-center justify-between py-2 px-3 bg-purple-500/20 rounded-lg border border-purple-500/30">
+                  <span className="text-sm font-medium text-purple-700 dark:text-purple-300">Level</span>
+                  <div className="flex items-center space-x-2">
+                    <Star className="w-4 h-4 text-purple-500" />
+                    <span className="font-bold text-purple-700 dark:text-purple-300">{profile?.level ?? 1}</span>
+                  </div>
+                </div>
+
+                {/* XP */}
+                <div className="flex items-center justify-between py-2 px-3 bg-blue-500/20 rounded-lg border border-blue-500/30">
+                  <span className="text-sm font-medium text-blue-700 dark:text-blue-300">XP</span>
+                  <div className="flex items-center space-x-2">
+                    <Trophy className="w-4 h-4 text-blue-500" />
+                    <span className="font-bold text-blue-700 dark:text-blue-300">{profile?.xp ?? 0}</span>
+                  </div>
+                </div>
+
+                {/* Coins */}
+                <div className="flex items-center justify-between py-2 px-3 bg-yellow-500/20 rounded-lg border border-yellow-500/30">
+                  <span className="text-sm font-medium text-yellow-700 dark:text-yellow-300">Coins</span>
+                  <div className="flex items-center space-x-2">
+                    <Coins className="w-4 h-4 text-yellow-600 dark:text-yellow-500" />
+                    <span className="font-bold text-yellow-700 dark:text-yellow-300">{userCoins}</span>
+                  </div>
                 </div>
               </div>
             )}

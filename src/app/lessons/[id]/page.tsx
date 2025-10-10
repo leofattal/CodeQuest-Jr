@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { PageTransition } from "@/components/common/PageTransition";
 import { createClient } from "@/lib/supabase/client";
+import { checkAndUnlockBadges } from "@/lib/badges/checkBadgeUnlocks";
 import {
   ArrowLeft,
   Play,
@@ -72,6 +73,7 @@ export default function LessonPage() {
   } | null>(null);
   const [isCompleted, setIsCompleted] = useState(false);
   const [consoleOutput, setConsoleOutput] = useState<string[]>([]);
+  const [newlyUnlockedBadges, setNewlyUnlockedBadges] = useState<Array<{ id: string; name: string; icon: string }>>([]);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const lessonId = params?.id as string;
@@ -447,21 +449,58 @@ export default function LessonPage() {
         return;
       }
 
-      // Update student coins and XP
+      // Update student coins, XP, and streak
       const { data: studentData } = await supabase
         .from("students")
-        .select("coins, xp")
+        .select("coins, xp, current_streak, longest_streak, last_lesson_date")
         .eq("id", user.id)
         .single();
 
       if (studentData) {
+        // Calculate new streak
+        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+        const lastDate = studentData.last_lesson_date;
+        let newStreak = studentData.current_streak || 0;
+
+        if (!lastDate || lastDate !== today) {
+          // Check if this continues the streak
+          if (lastDate) {
+            const lastDateTime = new Date(lastDate);
+            const todayTime = new Date(today);
+            const diffDays = Math.floor((todayTime.getTime() - lastDateTime.getTime()) / (1000 * 60 * 60 * 24));
+
+            if (diffDays === 1) {
+              // Consecutive day, increase streak
+              newStreak += 1;
+            } else if (diffDays > 1) {
+              // Streak broken, reset to 1
+              newStreak = 1;
+            }
+            // If diffDays === 0, same day, don't change streak
+          } else {
+            // First lesson ever
+            newStreak = 1;
+          }
+        }
+
+        const newLongestStreak = Math.max(newStreak, studentData.longest_streak || 0);
+
         await supabase
           .from("students")
           .update({
             coins: studentData.coins + lesson.coin_reward,
             xp: studentData.xp + lesson.xp_reward,
+            current_streak: newStreak,
+            longest_streak: newLongestStreak,
+            last_lesson_date: today,
           })
           .eq("id", user.id);
+      }
+
+      // Check for newly unlocked badges
+      const { newBadges } = await checkAndUnlockBadges(user.id);
+      if (newBadges.length > 0) {
+        setNewlyUnlockedBadges(newBadges);
       }
 
       setIsCompleted(true);
@@ -725,6 +764,42 @@ export default function LessonPage() {
           </div>
         </div>
       </div>
+
+      {/* Badge Unlock Modal */}
+      {newlyUnlockedBadges.length > 0 && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-background rounded-2xl p-8 max-w-md w-full border-2 border-yellow-400 shadow-2xl">
+            <div className="text-center">
+              <div className="text-6xl mb-4 animate-bounce">🎉</div>
+              <h2 className="text-3xl font-bold mb-2 bg-gradient-to-r from-yellow-400 to-yellow-600 bg-clip-text text-transparent">
+                Badge Unlocked!
+              </h2>
+              <p className="text-muted-foreground mb-6">
+                You&apos;ve earned {newlyUnlockedBadges.length} new badge{newlyUnlockedBadges.length !== 1 ? 's' : ''}!
+              </p>
+
+              <div className="space-y-4 mb-6">
+                {newlyUnlockedBadges.map((badge) => (
+                  <div
+                    key={badge.id}
+                    className="bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-950/20 dark:to-amber-950/20 rounded-xl p-4 border-2 border-yellow-400"
+                  >
+                    <div className="text-4xl mb-2">{badge.icon}</div>
+                    <div className="font-bold text-lg">{badge.name}</div>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                onClick={() => setNewlyUnlockedBadges([])}
+                className="w-full py-3 px-6 rounded-lg bg-gradient-to-r from-yellow-400 to-yellow-600 text-white font-semibold hover:opacity-90 transition-opacity"
+              >
+                Awesome!
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </PageTransition>
   );
 }

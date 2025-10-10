@@ -44,7 +44,6 @@ export default function ShopPage() {
     { id: "all", name: "All Items", icon: "🛍️" },
     { id: "avatar", name: "Avatars", icon: "👤" },
     { id: "power-up", name: "Power-ups", icon: "⚡" },
-    { id: "badge", name: "Badges", icon: "🏆" },
     { id: "theme", name: "Themes", icon: "🎨" },
   ];
 
