@@ -321,46 +321,52 @@ export default function LeaderboardPage() {
             </div>
           </div>
 
-          {/* Time Filter */}
-          <div className="flex flex-wrap gap-3 mb-6 justify-center">
-            {timeFilterOptions.map((option) => {
-              const Icon = option.icon;
-              return (
-                <button
-                  key={option.id}
-                  onClick={() => setTimeFilter(option.id)}
-                  className={`px-6 py-3 rounded-xl font-semibold transition-all flex items-center gap-2 border-2 ${
-                    timeFilter === option.id
-                      ? "bg-gradient-to-r from-primary to-secondary text-white border-primary shadow-lg scale-105"
-                      : "bg-background border-border hover:border-primary/50 hover:shadow-md"
-                  }`}
-                >
-                  <Icon className="w-5 h-5" />
-                  <span>{option.name}</span>
-                </button>
-              );
-            })}
-          </div>
+          {/* Tab Navigation */}
+          <div className="bg-muted/30 rounded-2xl p-2 mb-8">
+            {/* Time Filter Row */}
+            <div className="flex flex-wrap gap-2 mb-2 justify-center">
+              {timeFilterOptions.map((option) => {
+                const Icon = option.icon;
+                return (
+                  <button
+                    key={option.id}
+                    onClick={() => setTimeFilter(option.id)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                      timeFilter === option.id
+                        ? "bg-secondary text-secondary-foreground shadow-md"
+                        : "hover:bg-muted/50"
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    <span>{option.name}</span>
+                  </button>
+                );
+              })}
+            </div>
 
-          {/* Sort Options */}
-          <div className="flex flex-wrap gap-3 mb-8 justify-center">
-            {sortOptions.map((option) => {
-              const Icon = option.icon;
-              return (
-                <button
-                  key={option.id}
-                  onClick={() => setSortBy(option.id)}
-                  className={`px-6 py-3 rounded-lg font-semibold transition-all flex items-center gap-2 ${
-                    sortBy === option.id
-                      ? "bg-primary text-primary-foreground shadow-lg scale-105"
-                      : "bg-muted hover:bg-muted/80"
-                  }`}
-                >
-                  <Icon className={`w-5 h-5 ${sortBy === option.id ? "" : option.color}`} />
-                  <span>{option.name}</span>
-                </button>
-              );
-            })}
+            {/* Divider */}
+            <div className="h-px bg-border my-2" />
+
+            {/* Sort Tabs */}
+            <div className="flex flex-wrap gap-1 justify-center">
+              {sortOptions.map((option) => {
+                const Icon = option.icon;
+                return (
+                  <button
+                    key={option.id}
+                    onClick={() => setSortBy(option.id)}
+                    className={`flex-1 min-w-[140px] px-6 py-4 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${
+                      sortBy === option.id
+                        ? "bg-gradient-to-br from-primary to-secondary text-white shadow-lg scale-105"
+                        : "bg-background/50 hover:bg-background hover:shadow-md"
+                    }`}
+                  >
+                    <Icon className={`w-5 h-5 ${sortBy === option.id ? "" : option.color}`} />
+                    <span>{option.name}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* User's Rank Card (if logged in and not in top 3) */}
@@ -457,7 +463,7 @@ export default function LeaderboardPage() {
           )}
 
           {/* Rankings List (4-100) */}
-          <div className="bg-background rounded-xl border border-border overflow-hidden">
+          <div className="space-y-3">
             {leaders.slice(3).map((entry) => {
               const rankIcon = getRankIcon(entry.rank!);
               const isCurrentUser = user?.id === entry.id;
@@ -465,45 +471,98 @@ export default function LeaderboardPage() {
               return (
                 <div
                   key={entry.id}
-                  className={`flex items-center justify-between p-4 border-b border-border last:border-b-0 ${
-                    isCurrentUser ? "bg-primary/5 border-l-4 border-l-primary" : ""
+                  className={`bg-background rounded-xl border-2 transition-all hover:shadow-lg ${
+                    isCurrentUser
+                      ? "border-primary shadow-md"
+                      : "border-border hover:border-primary/30"
                   }`}
                 >
-                  <div className="flex items-center gap-4 flex-1 min-w-0">
-                    <div className={`w-10 h-10 rounded-full bg-muted flex items-center justify-center font-bold flex-shrink-0 ${rankIcon.color}`}>
-                      {typeof rankIcon.icon === "string" && rankIcon.icon.length <= 2 ? (
-                        <span className="text-xl">{rankIcon.icon}</span>
-                      ) : (
-                        <span className="text-sm">{rankIcon.icon}</span>
-                      )}
-                    </div>
+                  {/* Main Card Content */}
+                  <div className="p-5">
+                    <div className="flex items-center gap-4">
+                      {/* Rank Badge */}
+                      <div className={`w-14 h-14 rounded-xl bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center font-bold flex-shrink-0 ${rankIcon.color} shadow-sm`}>
+                        {typeof rankIcon.icon === "string" && rankIcon.icon.length <= 2 ? (
+                          <span className="text-2xl">{rankIcon.icon}</span>
+                        ) : (
+                          <span className="text-lg">{rankIcon.icon}</span>
+                        )}
+                      </div>
 
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      {entry.avatar_url ? (
-                        <img
-                          src={entry.avatar_url}
-                          alt={entry.display_name}
-                          className="w-10 h-10 rounded-full flex-shrink-0"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-xl flex-shrink-0">
-                          👤
+                      {/* User Info */}
+                      <div className="flex items-center gap-4 flex-1 min-w-0">
+                        {entry.avatar_url ? (
+                          <img
+                            src={entry.avatar_url}
+                            alt={entry.display_name}
+                            className="w-14 h-14 rounded-full border-2 border-border flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="w-14 h-14 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center text-2xl flex-shrink-0 border-2 border-border">
+                            👤
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-bold text-lg truncate">
+                              {entry.display_name}
+                            </h3>
+                            {isCurrentUser && (
+                              <span className="px-2 py-0.5 bg-primary text-primary-foreground text-xs font-semibold rounded-full">
+                                You
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            Level {entry.level} • {entry.lessons_completed || 0} lessons completed
+                          </div>
                         </div>
-                      )}
-                      <div className="min-w-0">
-                        <div className="font-bold truncate">
-                          {entry.display_name}
-                          {isCurrentUser && <span className="text-primary ml-2">(You)</span>}
+                      </div>
+
+                      {/* Main Stat */}
+                      <div className="text-right flex-shrink-0 ml-4">
+                        <div className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                          {getStatValue(entry)}
                         </div>
-                        <div className="text-sm text-muted-foreground">
-                          Level {entry.level} • {entry.lessons_completed || 0} lessons
+                        <div className="text-xs text-muted-foreground uppercase tracking-wide">
+                          {sortOptions.find(opt => opt.id === sortBy)?.name}
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="text-right flex-shrink-0 ml-4">
-                    <div className="font-bold">{getStatValue(entry)}</div>
+                  {/* Stats Bar */}
+                  <div className="border-t border-border bg-muted/20 px-5 py-3">
+                    <div className="grid grid-cols-4 gap-4 text-center">
+                      <div>
+                        <div className="text-xs text-muted-foreground mb-1">XP</div>
+                        <div className="font-semibold text-sm flex items-center justify-center gap-1">
+                          <Zap className="w-3 h-3 text-purple-500" />
+                          {entry.xp.toLocaleString()}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-muted-foreground mb-1">Coins</div>
+                        <div className="font-semibold text-sm flex items-center justify-center gap-1">
+                          <Coins className="w-3 h-3 text-yellow-500" />
+                          {entry.coins.toLocaleString()}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-muted-foreground mb-1">Level</div>
+                        <div className="font-semibold text-sm flex items-center justify-center gap-1">
+                          <TrendingUp className="w-3 h-3 text-blue-500" />
+                          {entry.level}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-muted-foreground mb-1">Streak</div>
+                        <div className="font-semibold text-sm flex items-center justify-center gap-1">
+                          <Flame className="w-3 h-3 text-orange-500" />
+                          {entry.current_streak || 0}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               );
