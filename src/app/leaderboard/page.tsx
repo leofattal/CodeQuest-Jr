@@ -8,7 +8,10 @@ import {
   Trophy,
   Coins,
   Zap,
-  TrendingUp
+  TrendingUp,
+  Flame,
+  Calendar,
+  Award
 } from "lucide-react";
 
 interface LeaderboardEntry {
@@ -18,10 +21,13 @@ interface LeaderboardEntry {
   coins: number;
   xp: number;
   level: number;
+  current_streak: number | null;
   rank?: number;
+  lessons_completed?: number;
 }
 
-type SortBy = "xp" | "coins" | "level";
+type SortBy = "xp" | "coins" | "level" | "current_streak";
+type TimeFilter = "all_time" | "this_month" | "this_week";
 
 /**
  * Leaderboard Page
@@ -33,11 +39,19 @@ export default function LeaderboardPage() {
   const [userRank, setUserRank] = useState<LeaderboardEntry | null>(null);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState<SortBy>("xp");
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>("all_time");
 
   const sortOptions = [
     { id: "xp" as SortBy, name: "Total XP", icon: Zap, color: "text-purple-500" },
     { id: "coins" as SortBy, name: "Coins", icon: Coins, color: "text-yellow-500" },
     { id: "level" as SortBy, name: "Level", icon: TrendingUp, color: "text-blue-500" },
+    { id: "current_streak" as SortBy, name: "Streak", icon: Flame, color: "text-orange-500" },
+  ];
+
+  const timeFilterOptions = [
+    { id: "all_time" as TimeFilter, name: "All Time", icon: Trophy },
+    { id: "this_month" as TimeFilter, name: "This Month", icon: Calendar },
+    { id: "this_week" as TimeFilter, name: "This Week", icon: Award },
   ];
 
   useEffect(() => {
@@ -45,20 +59,104 @@ export default function LeaderboardPage() {
       try {
         const supabase = createClient();
 
-        // Fetch top 100 students sorted by selected metric
-        const { data, error } = await supabase
-          .from("students")
-          .select("id, display_name, avatar_url, coins, xp, level")
-          .order(sortBy, { ascending: false })
-          .limit(100);
+        // Calculate date filter
+        let dateFilter = null;
+        if (timeFilter === "this_week") {
+          const weekAgo = new Date();
+          weekAgo.setDate(weekAgo.getDate() - 7);
+          dateFilter = weekAgo.toISOString();
+        } else if (timeFilter === "this_month") {
+          const monthAgo = new Date();
+          monthAgo.setMonth(monthAgo.getMonth() - 1);
+          dateFilter = monthAgo.toISOString();
+        }
+
+        let data;
+        let error;
+
+        if (timeFilter === "all_time") {
+          // Fetch all-time leaderboard
+          const result = await supabase
+            .from("students")
+            .select("id, display_name, avatar_url, coins, xp, level, current_streak")
+            .order(sortBy, { ascending: false })
+            .limit(100);
+          data = result.data;
+          error = result.error;
+        } else {
+          // For time-based filters, we need to aggregate from student_progress
+          const { data: studentsData, error: studentsError } = await supabase
+            .from("students")
+            .select("id, display_name, avatar_url, level, current_streak");
+
+          if (studentsError) {
+            console.error("Error fetching students:", studentsError);
+            return;
+          }
+
+          // Fetch progress data within time range
+          const { data: progressData } = await supabase
+            .from("student_progress")
+            .select("student_id, coins_earned, xp_earned, completed_at")
+            .eq("completed", true)
+            .gte("completed_at", dateFilter!);
+
+          // Aggregate stats per student
+          const studentStats = new Map<string, { coins: number; xp: number }>();
+
+          progressData?.forEach((progress) => {
+            const current = studentStats.get(progress.student_id) || { coins: 0, xp: 0 };
+            studentStats.set(progress.student_id, {
+              coins: current.coins + (progress.coins_earned || 0),
+              xp: current.xp + (progress.xp_earned || 0),
+            });
+          });
+
+          // Combine student data with aggregated stats
+          data = studentsData
+            .map((student) => {
+              const stats = studentStats.get(student.id) || { coins: 0, xp: 0 };
+              return {
+                ...student,
+                coins: stats.coins,
+                xp: stats.xp,
+              };
+            })
+            .filter((student) => {
+              // Filter out students with no activity in the time period
+              return sortBy === "current_streak" || sortBy === "level" || student[sortBy] > 0;
+            })
+            .sort((a, b) => {
+              const aValue = a[sortBy] || 0;
+              const bValue = b[sortBy] || 0;
+              return bValue - aValue;
+            })
+            .slice(0, 100);
+        }
 
         if (error) {
           console.error("Error fetching leaderboard:", error);
           return;
         }
 
+        // Fetch lessons completed count for each student
+        const studentsWithLessons = await Promise.all(
+          (data || []).map(async (entry) => {
+            const { count } = await supabase
+              .from("student_progress")
+              .select("*", { count: "exact", head: true })
+              .eq("student_id", entry.id)
+              .eq("completed", true);
+
+            return {
+              ...entry,
+              lessons_completed: count || 0,
+            };
+          })
+        );
+
         // Add rank to each entry
-        const rankedData = (data || []).map((entry, index) => ({
+        const rankedData = studentsWithLessons.map((entry, index) => ({
           ...entry,
           rank: index + 1,
         }));
@@ -74,20 +172,29 @@ export default function LeaderboardPage() {
             // User not in top 100, fetch their individual stats
             const { data: userData } = await supabase
               .from("students")
-              .select("id, display_name, avatar_url, coins, xp, level")
+              .select("id, display_name, avatar_url, coins, xp, level, current_streak")
               .eq("id", user.id)
               .single();
 
             if (userData) {
               // Get user's rank by counting how many have higher scores
+              const sortValue = userData[sortBy as keyof typeof userData];
               const { count } = await supabase
                 .from("students")
                 .select("*", { count: "exact", head: true })
-                .gt(sortBy, userData[sortBy]);
+                .gt(sortBy, sortValue);
+
+              // Fetch lessons completed
+              const { count: lessonsCount } = await supabase
+                .from("student_progress")
+                .select("*", { count: "exact", head: true })
+                .eq("student_id", user.id)
+                .eq("completed", true);
 
               setUserRank({
                 ...userData,
                 rank: (count || 0) + 1,
+                lessons_completed: lessonsCount || 0,
               });
             }
           }
@@ -100,7 +207,7 @@ export default function LeaderboardPage() {
     }
 
     fetchLeaderboard();
-  }, [sortBy, user]);
+  }, [sortBy, timeFilter, user]);
 
   const getRankIcon = (rank: number) => {
     if (rank === 1) return { icon: "🥇", color: "text-yellow-400" };
@@ -117,6 +224,8 @@ export default function LeaderboardPage() {
         return `${entry.coins.toLocaleString()} Coins`;
       case "level":
         return `Level ${entry.level}`;
+      case "current_streak":
+        return `${entry.current_streak || 0} day${(entry.current_streak || 0) !== 1 ? 's' : ''}`;
     }
   };
 
@@ -143,6 +252,27 @@ export default function LeaderboardPage() {
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
               See where you rank among top coders!
             </p>
+          </div>
+
+          {/* Time Filter */}
+          <div className="flex flex-wrap gap-2 mb-4 justify-center">
+            {timeFilterOptions.map((option) => {
+              const Icon = option.icon;
+              return (
+                <button
+                  key={option.id}
+                  onClick={() => setTimeFilter(option.id)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                    timeFilter === option.id
+                      ? "bg-secondary text-secondary-foreground shadow"
+                      : "bg-muted/50 hover:bg-muted"
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span>{option.name}</span>
+                </button>
+              );
+            })}
           </div>
 
           {/* Sort Options */}
@@ -298,7 +428,9 @@ export default function LeaderboardPage() {
                           {entry.display_name}
                           {isCurrentUser && <span className="text-primary ml-2">(You)</span>}
                         </div>
-                        <div className="text-sm text-muted-foreground">Level {entry.level}</div>
+                        <div className="text-sm text-muted-foreground">
+                          Level {entry.level} • {entry.lessons_completed || 0} lessons
+                        </div>
                       </div>
                     </div>
                   </div>
