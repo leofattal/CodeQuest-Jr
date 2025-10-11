@@ -11,7 +11,9 @@ import {
   TrendingUp,
   Flame,
   Calendar,
-  Award
+  Award,
+  Users,
+  Target
 } from "lucide-react";
 
 interface LeaderboardEntry {
@@ -40,6 +42,12 @@ export default function LeaderboardPage() {
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState<SortBy>("xp");
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all_time");
+  const [stats, setStats] = useState({
+    totalStudents: 0,
+    totalXP: 0,
+    totalLessonsCompleted: 0,
+    totalCoins: 0
+  });
 
   const sortOptions = [
     { id: "xp" as SortBy, name: "Total XP", icon: Zap, color: "text-purple-500" },
@@ -163,6 +171,30 @@ export default function LeaderboardPage() {
 
         setLeaders(rankedData);
 
+        // Fetch global stats
+        const { data: allStudentsData } = await supabase
+          .from("students")
+          .select("xp, coins");
+
+        const { count: totalStudentsCount } = await supabase
+          .from("students")
+          .select("*", { count: "exact", head: true });
+
+        const { count: totalLessonsCount } = await supabase
+          .from("student_progress")
+          .select("*", { count: "exact", head: true })
+          .eq("completed", true);
+
+        const totalXP = allStudentsData?.reduce((sum, student) => sum + (student.xp || 0), 0) || 0;
+        const totalCoins = allStudentsData?.reduce((sum, student) => sum + (student.coins || 0), 0) || 0;
+
+        setStats({
+          totalStudents: totalStudentsCount || 0,
+          totalXP,
+          totalLessonsCompleted: totalLessonsCount || 0,
+          totalCoins
+        });
+
         // Find current user's rank if logged in
         if (user) {
           const userEntry = rankedData.find(entry => entry.id === user.id);
@@ -249,9 +281,44 @@ export default function LeaderboardPage() {
               <Trophy className="w-10 h-10 text-yellow-500" />
               <h1 className="text-4xl md:text-5xl font-bold">Leaderboard</h1>
             </div>
-            <p className="text-xl font-semibold text-foreground/90 max-w-2xl mx-auto">
+            <p className="text-xl font-semibold text-foreground/90 max-w-2xl mx-auto mb-6">
               See where you rank among top coders!
             </p>
+
+            {/* Global Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto mt-6">
+              <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 rounded-xl p-4 border border-blue-500/20">
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <Users className="w-5 h-5 text-blue-500" />
+                  <span className="text-sm font-medium text-muted-foreground">Total Students</span>
+                </div>
+                <div className="text-3xl font-bold text-blue-500">{stats.totalStudents.toLocaleString()}</div>
+              </div>
+
+              <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-xl p-4 border border-purple-500/20">
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <Zap className="w-5 h-5 text-purple-500" />
+                  <span className="text-sm font-medium text-muted-foreground">Total XP Earned</span>
+                </div>
+                <div className="text-3xl font-bold text-purple-500">{stats.totalXP.toLocaleString()}</div>
+              </div>
+
+              <div className="bg-gradient-to-br from-yellow-500/10 to-orange-500/10 rounded-xl p-4 border border-yellow-500/20">
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <Coins className="w-5 h-5 text-yellow-500" />
+                  <span className="text-sm font-medium text-muted-foreground">Total Coins</span>
+                </div>
+                <div className="text-3xl font-bold text-yellow-500">{stats.totalCoins.toLocaleString()}</div>
+              </div>
+
+              <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 rounded-xl p-4 border border-green-500/20">
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <Target className="w-5 h-5 text-green-500" />
+                  <span className="text-sm font-medium text-muted-foreground">Lessons Done</span>
+                </div>
+                <div className="text-3xl font-bold text-green-500">{stats.totalLessonsCompleted.toLocaleString()}</div>
+              </div>
+            </div>
           </div>
 
           {/* Time Filter */}
