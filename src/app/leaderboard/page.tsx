@@ -249,26 +249,26 @@ export default function LeaderboardPage() {
               <Trophy className="w-10 h-10 text-yellow-500" />
               <h1 className="text-4xl md:text-5xl font-bold">Leaderboard</h1>
             </div>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            <p className="text-xl font-semibold text-foreground/90 max-w-2xl mx-auto">
               See where you rank among top coders!
             </p>
           </div>
 
           {/* Time Filter */}
-          <div className="flex flex-wrap gap-2 mb-4 justify-center">
+          <div className="flex flex-wrap gap-3 mb-6 justify-center">
             {timeFilterOptions.map((option) => {
               const Icon = option.icon;
               return (
                 <button
                   key={option.id}
                   onClick={() => setTimeFilter(option.id)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                  className={`px-6 py-3 rounded-xl font-semibold transition-all flex items-center gap-2 border-2 ${
                     timeFilter === option.id
-                      ? "bg-secondary text-secondary-foreground shadow"
-                      : "bg-muted/50 hover:bg-muted"
+                      ? "bg-gradient-to-r from-primary to-secondary text-white border-primary shadow-lg scale-105"
+                      : "bg-background border-border hover:border-primary/50 hover:shadow-md"
                   }`}
                 >
-                  <Icon className="w-4 h-4" />
+                  <Icon className="w-5 h-5" />
                   <span>{option.name}</span>
                 </button>
               );
