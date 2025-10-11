@@ -8,6 +8,8 @@ import { createClient } from "@/lib/supabase/client";
 interface Badge {
   id: string;
   name: string;
+  icon: string;
+  description: string;
   unlock_condition: {
     type: string;
     count?: number;
@@ -81,7 +83,7 @@ export async function checkAndUnlockBadges(studentId: string): Promise<UnlockRes
       console.error("Error fetching progress:", progressError);
     }
 
-    const completedLessons = progress?.filter(p => p.is_completed) || [];
+    const completedLessons = progress?.filter(p => p.completed) || [];
     const completedLessonIds = new Set(completedLessons.map(p => p.lesson_id));
 
     // Check each badge

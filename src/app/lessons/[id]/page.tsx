@@ -12,7 +12,9 @@ import {
   Lightbulb,
   Award,
   Clock,
-  Coins as CoinsIcon
+  Coins as CoinsIcon,
+  RotateCcw,
+  Timer
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -73,8 +75,12 @@ export default function LessonPage() {
   } | null>(null);
   const [isCompleted, setIsCompleted] = useState(false);
   const [consoleOutput, setConsoleOutput] = useState<string[]>([]);
-  const [newlyUnlockedBadges, setNewlyUnlockedBadges] = useState<Array<{ id: string; name: string; icon: string }>>([]);
+  const [newlyUnlockedBadges, setNewlyUnlockedBadges] = useState<Array<{ id: string; name: string; icon: string; description: string }>>([]);
+  const [elapsedTime, setElapsedTime] = useState(0); // in seconds
+  const [isTimerRunning, setIsTimerRunning] = useState(false);
+  const [levelUpInfo, setLevelUpInfo] = useState<{ oldLevel: number; newLevel: number; coinsEarned: number } | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const lessonId = params?.id as string;
 
@@ -96,7 +102,18 @@ export default function LessonPage() {
         }
 
         setLesson(lessonData);
-        setCode(lessonData.starter_code || "");
+
+        // Load saved code from localStorage or use starter code
+        const savedCodeKey = `lesson_code_${lessonId}`;
+        const savedCode = localStorage.getItem(savedCodeKey);
+        setCode(savedCode || lessonData.starter_code || "");
+
+        // Load saved timer from localStorage
+        const savedTimerKey = `lesson_timer_${lessonId}`;
+        const savedTime = localStorage.getItem(savedTimerKey);
+        if (savedTime) {
+          setElapsedTime(parseInt(savedTime, 10));
+        }
 
         // Fetch world info
         const { data: worldData, error: worldError } = await supabase
@@ -122,6 +139,9 @@ export default function LessonPage() {
 
           if (progressData?.completed) {
             setIsCompleted(true);
+          } else {
+            // Start timer if lesson is not completed
+            setIsTimerRunning(true);
           }
         }
       } catch (error) {
@@ -135,6 +155,40 @@ export default function LessonPage() {
       fetchLesson();
     }
   }, [lessonId, user]);
+
+  // Timer effect - runs every second when timer is active
+  useEffect(() => {
+    if (isTimerRunning && !isCompleted) {
+      timerIntervalRef.current = setInterval(() => {
+        setElapsedTime((prev) => {
+          const newTime = prev + 1;
+          // Save to localStorage every second
+          const savedTimerKey = `lesson_timer_${lessonId}`;
+          localStorage.setItem(savedTimerKey, newTime.toString());
+          return newTime;
+        });
+      }, 1000);
+    } else {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+    }
+
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+    };
+  }, [isTimerRunning, isCompleted, lessonId]);
+
+  // Save code to localStorage when it changes
+  useEffect(() => {
+    if (lessonId && code) {
+      const savedCodeKey = `lesson_code_${lessonId}`;
+      localStorage.setItem(savedCodeKey, code);
+    }
+  }, [code, lessonId]);
 
   // Update preview when code changes
   useEffect(() => {
@@ -423,6 +477,37 @@ export default function LessonPage() {
     }
   };
 
+  const resetCode = () => {
+    if (lesson) {
+      setCode(lesson.starter_code || "");
+      // Clear saved code from localStorage
+      const savedCodeKey = `lesson_code_${lessonId}`;
+      localStorage.removeItem(savedCodeKey);
+    }
+  };
+
+  const formatTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Calculate XP required for a given level
+  const getXPForLevel = (level: number): number => {
+    // Level 1 = 0 XP, Level 2 = 100 XP, Level 3 = 250 XP, Level 4 = 450 XP, etc.
+    // Formula: XP = 50 * level * (level - 1)
+    return 50 * level * (level - 1);
+  };
+
+  // Calculate level from total XP
+  const getLevelFromXP = (xp: number): number => {
+    let level = 1;
+    while (getXPForLevel(level + 1) <= xp) {
+      level++;
+    }
+    return level;
+  };
+
   const completeLesson = async () => {
     if (!user || !lesson) return;
 
@@ -441,6 +526,7 @@ export default function LessonPage() {
           attempts: 1,
           coins_earned: lesson.coin_reward,
           xp_earned: lesson.xp_reward,
+          time_spent_seconds: elapsedTime,
           completed_at: new Date().toISOString(),
         });
 
@@ -452,7 +538,7 @@ export default function LessonPage() {
       // Update student coins, XP, and streak
       const { data: studentData } = await supabase
         .from("students")
-        .select("coins, xp, current_streak, longest_streak, last_lesson_date")
+        .select("coins, xp, level, current_streak, longest_streak, last_lesson_date")
         .eq("id", user.id)
         .single();
 
@@ -485,11 +571,28 @@ export default function LessonPage() {
 
         const newLongestStreak = Math.max(newStreak, studentData.longest_streak || 0);
 
+        // Calculate level progression
+        const oldXP = studentData.xp;
+        const newXP = oldXP + lesson.xp_reward;
+        const oldLevel = getLevelFromXP(oldXP);
+        const newLevel = getLevelFromXP(newXP);
+
+        // Check if player leveled up
+        const levelsGained = newLevel - oldLevel;
+        const levelUpCoins = levelsGained * 50; // 50 coins per level
+
+        let totalCoins = studentData.coins + lesson.coin_reward;
+        if (levelsGained > 0) {
+          totalCoins += levelUpCoins;
+          setLevelUpInfo({ oldLevel, newLevel, coinsEarned: levelUpCoins });
+        }
+
         await supabase
           .from("students")
           .update({
-            coins: studentData.coins + lesson.coin_reward,
-            xp: studentData.xp + lesson.xp_reward,
+            coins: totalCoins,
+            xp: newXP,
+            level: newLevel,
             current_streak: newStreak,
             longest_streak: newLongestStreak,
             last_lesson_date: today,
@@ -502,6 +605,13 @@ export default function LessonPage() {
       if (newBadges.length > 0) {
         setNewlyUnlockedBadges(newBadges);
       }
+
+      // Stop timer and clear saved data when lesson is completed
+      setIsTimerRunning(false);
+      const savedCodeKey = `lesson_code_${lessonId}`;
+      const savedTimerKey = `lesson_timer_${lessonId}`;
+      localStorage.removeItem(savedCodeKey);
+      localStorage.removeItem(savedTimerKey);
 
       setIsCompleted(true);
     } catch (error) {
@@ -571,7 +681,12 @@ export default function LessonPage() {
                 <p className="text-white/90">{lesson.description}</p>
               </div>
 
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4 flex-wrap">
+                {/* Timer */}
+                <div className="flex items-center gap-2 bg-white/20 rounded-lg px-4 py-2">
+                  <Timer className="w-4 h-4" />
+                  <span className="text-sm font-mono">{formatTime(elapsedTime)}</span>
+                </div>
                 <div className="flex items-center gap-2 bg-white/20 rounded-lg px-4 py-2">
                   <Clock className="w-4 h-4" />
                   <span className="text-sm">{lesson.estimated_minutes} min</span>
@@ -666,8 +781,16 @@ export default function LessonPage() {
             <div className="space-y-4">
               {/* Code Editor */}
               <div className="bg-background rounded-xl border border-border overflow-hidden">
-                <div className="bg-muted px-4 py-2 border-b border-border">
+                <div className="bg-muted px-4 py-2 border-b border-border flex items-center justify-between">
                   <h3 className="font-semibold">Code Editor</h3>
+                  <button
+                    onClick={resetCode}
+                    className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+                    title="Reset to starter code"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    Reset
+                  </button>
                 </div>
                 <textarea
                   value={code}
@@ -764,6 +887,42 @@ export default function LessonPage() {
           </div>
         </div>
       </div>
+
+      {/* Level Up Modal */}
+      {levelUpInfo && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-background rounded-2xl p-8 max-w-md w-full border-2 border-purple-400 shadow-2xl">
+            <div className="text-center">
+              <div className="text-6xl mb-4 animate-bounce">🎊</div>
+              <h2 className="text-3xl font-bold mb-2 bg-gradient-to-r from-purple-400 to-pink-600 bg-clip-text text-transparent">
+                Level Up!
+              </h2>
+              <p className="text-muted-foreground mb-6">
+                You&apos;ve reached Level {levelUpInfo.newLevel}!
+              </p>
+
+              <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/20 dark:to-pink-950/20 rounded-xl p-6 mb-6 border-2 border-purple-400">
+                <div className="text-5xl font-bold mb-2 text-purple-600 dark:text-purple-400">
+                  {levelUpInfo.oldLevel} → {levelUpInfo.newLevel}
+                </div>
+                <div className="text-sm text-muted-foreground mb-4">Level Progress</div>
+                <div className="flex items-center justify-center gap-2 text-yellow-600 dark:text-yellow-400">
+                  <CoinsIcon className="w-6 h-6" />
+                  <span className="text-2xl font-bold">+{levelUpInfo.coinsEarned}</span>
+                  <span className="text-lg">coins</span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setLevelUpInfo(null)}
+                className="w-full py-3 px-6 rounded-lg bg-gradient-to-r from-purple-400 to-pink-600 text-white font-semibold hover:opacity-90 transition-opacity"
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Badge Unlock Modal */}
       {newlyUnlockedBadges.length > 0 && (

@@ -18,6 +18,10 @@ export interface StudentProfile {
   created_at: string;
   updated_at: string;
   last_active_at: string;
+  current_streak: number | null;
+  longest_streak: number | null;
+  selected_avatar_id: string | null;
+  selected_theme_id: string | null;
 }
 
 interface AuthContextType {

@@ -8,43 +8,49 @@ import {
   ShoppingBag,
   Coins,
   Check,
-  Lock,
-  Sparkles
+  Sparkles,
+  Palette,
+  Smile
 } from "lucide-react";
 
-interface ShopItem {
+interface Theme {
   id: string;
   name: string;
   description: string;
-  category: string;
-  price: number;
-  icon: string;
-  required_level: number;
-  is_available: boolean;
+  preview_colors: {
+    primary: string;
+    secondary: string;
+    background: string;
+  };
+  is_premium: boolean;
+  coin_cost: number;
 }
 
-interface InventoryItem {
-  item_id: string;
-  is_equipped: boolean;
+interface Avatar {
+  id: string;
+  name: string;
+  emoji: string;
+  category: string;
+  is_premium: boolean;
+  coin_cost: number;
 }
 
 /**
  * Shop Page
- * Browse and purchase items with earned coins
+ * Browse and purchase themes and avatars with earned coins
  */
 export default function ShopPage() {
-  const { user, profile } = useAuth();
-  const [items, setItems] = useState<ShopItem[]>([]);
-  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const { user, profile, refreshProfile } = useAuth();
+  const [themes, setThemes] = useState<Theme[]>([]);
+  const [avatars, setAvatars] = useState<Avatar[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [purchasingItemId, setPurchasingItemId] = useState<string | null>(null);
 
   const categories = [
     { id: "all", name: "All Items", icon: "🛍️" },
-    { id: "avatar", name: "Avatars", icon: "👤" },
-    { id: "power-up", name: "Power-ups", icon: "⚡" },
-    { id: "theme", name: "Themes", icon: "🎨" },
+    { id: "avatars", name: "Avatars", icon: "👤" },
+    { id: "themes", name: "Themes", icon: "🎨" },
   ];
 
   useEffect(() => {
@@ -52,33 +58,28 @@ export default function ShopPage() {
       try {
         const supabase = createClient();
 
-        // Fetch shop items
-        const { data: itemsData, error: itemsError } = await supabase
-          .from("shop_items")
+        // Fetch themes
+        const { data: themesData, error: themesError } = await supabase
+          .from("themes")
           .select("*")
-          .eq("is_available", true)
-          .order("category")
-          .order("price");
+          .order("coin_cost");
 
-        if (itemsError) {
-          console.error("Error fetching shop items:", itemsError);
-          return;
+        if (themesError) {
+          console.error("Error fetching themes:", themesError);
+        } else {
+          setThemes(themesData || []);
         }
 
-        setItems(itemsData || []);
+        // Fetch avatars
+        const { data: avatarsData, error: avatarsError } = await supabase
+          .from("avatars")
+          .select("*")
+          .order("coin_cost");
 
-        // Fetch user inventory if logged in
-        if (user) {
-          const { data: inventoryData, error: inventoryError } = await supabase
-            .from("student_inventory")
-            .select("item_id, is_equipped")
-            .eq("student_id", user.id);
-
-          if (inventoryError) {
-            console.error("Error fetching inventory:", inventoryError);
-          } else {
-            setInventory(inventoryData || []);
-          }
+        if (avatarsError) {
+          console.error("Error fetching avatars:", avatarsError);
+        } else {
+          setAvatars(avatarsData || []);
         }
       } catch (error) {
         console.error("Error fetching shop data:", error);
@@ -90,84 +91,101 @@ export default function ShopPage() {
     fetchShopData();
   }, [user]);
 
-  const purchaseItem = async (item: ShopItem) => {
+  const purchaseTheme = async (theme: Theme) => {
     if (!user || !profile) {
       alert("Please log in to purchase items!");
       return;
     }
 
-    if (profile.coins < item.price) {
-      alert(`Not enough coins! You need ${item.price - profile.coins} more coins.`);
+    if (profile.coins < theme.coin_cost) {
+      alert(`Not enough coins! You need ${theme.coin_cost - profile.coins} more coins.`);
       return;
     }
 
-    if (profile.level < item.required_level) {
-      alert(`You need to reach level ${item.required_level} to purchase this item!`);
+    if (profile.selected_theme_id === theme.id) {
+      alert("You already own this theme!");
       return;
     }
 
-    if (inventory.some(inv => inv.item_id === item.id)) {
-      alert("You already own this item!");
-      return;
-    }
-
-    setPurchasingItemId(item.id);
+    setPurchasingItemId(theme.id);
 
     try {
       const supabase = createClient();
 
-      // Deduct coins from user
-      const newCoins = profile.coins - item.price;
-      const { error: updateError } = await supabase
+      // Deduct coins and select theme
+      const { error } = await supabase
         .from("students")
-        .update({ coins: newCoins })
+        .update({
+          coins: profile.coins - theme.coin_cost,
+          selected_theme_id: theme.id
+        })
         .eq("id", user.id);
 
-      if (updateError) {
-        console.error("Error updating coins:", updateError);
+      if (error) {
+        console.error("Error purchasing theme:", error);
         alert("Purchase failed. Please try again.");
-        setPurchasingItemId(null);
         return;
       }
 
-      // Add item to inventory
-      const { error: inventoryError } = await supabase
-        .from("student_inventory")
-        .insert({
-          student_id: user.id,
-          item_id: item.id,
-        });
-
-      if (inventoryError) {
-        console.error("Error adding to inventory:", inventoryError);
-
-        // Refund coins if inventory insert failed
-        await supabase
-          .from("students")
-          .update({ coins: profile.coins })
-          .eq("id", user.id);
-
-        alert("Purchase failed. Please try again.");
-        setPurchasingItemId(null);
-        return;
-      }
-
-      // Update local state
-      setInventory([...inventory, { item_id: item.id, is_equipped: false }]);
-
-      // Refresh profile to update coins display
-      window.location.reload();
+      alert(`${theme.name} purchased and equipped!`);
+      await refreshProfile();
     } catch (error) {
-      console.error("Error purchasing item:", error);
+      console.error("Error purchasing theme:", error);
       alert("Purchase failed. Please try again.");
     } finally {
       setPurchasingItemId(null);
     }
   };
 
-  const filteredItems = selectedCategory === "all"
-    ? items
-    : items.filter(item => item.category === selectedCategory);
+  const purchaseAvatar = async (avatar: Avatar) => {
+    if (!user || !profile) {
+      alert("Please log in to purchase items!");
+      return;
+    }
+
+    if (profile.coins < avatar.coin_cost) {
+      alert(`Not enough coins! You need ${avatar.coin_cost - profile.coins} more coins.`);
+      return;
+    }
+
+    if (profile.selected_avatar_id === avatar.id) {
+      alert("You already own this avatar!");
+      return;
+    }
+
+    setPurchasingItemId(avatar.id);
+
+    try {
+      const supabase = createClient();
+
+      // Deduct coins and select avatar
+      const { error } = await supabase
+        .from("students")
+        .update({
+          coins: profile.coins - avatar.coin_cost,
+          selected_avatar_id: avatar.id
+        })
+        .eq("id", user.id);
+
+      if (error) {
+        console.error("Error purchasing avatar:", error);
+        alert("Purchase failed. Please try again.");
+        return;
+      }
+
+      alert(`${avatar.name} purchased and equipped!`);
+      await refreshProfile();
+    } catch (error) {
+      console.error("Error purchasing avatar:", error);
+      alert("Purchase failed. Please try again.");
+    } finally {
+      setPurchasingItemId(null);
+    }
+  };
+
+  // Filter items based on category
+  const filteredThemes = selectedCategory === "all" || selectedCategory === "themes" ? themes : [];
+  const filteredAvatars = selectedCategory === "all" || selectedCategory === "avatars" ? avatars : [];
 
   if (loading) {
     return (
@@ -190,7 +208,7 @@ export default function ShopPage() {
               <h1 className="text-4xl md:text-5xl font-bold">Shop</h1>
             </div>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Spend your hard-earned coins on awesome items!
+              Spend your hard-earned coins on awesome themes and avatars!
             </p>
           </div>
 
@@ -229,117 +247,189 @@ export default function ShopPage() {
             ))}
           </div>
 
-          {/* Items Grid */}
-          {filteredItems.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground text-lg">No items in this category yet.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {filteredItems.map((item) => {
-                const isOwned = inventory.some(inv => inv.item_id === item.id);
-                const canAfford = profile ? profile.coins >= item.price : false;
-                const meetsLevel = profile ? profile.level >= item.required_level : false;
-                const isPurchasing = purchasingItemId === item.id;
+          {/* Themes Section */}
+          {filteredThemes.length > 0 && (
+            <div className="mb-12">
+              <div className="flex items-center gap-3 mb-6">
+                <Palette className="w-6 h-6 text-primary" />
+                <h2 className="text-2xl font-bold">Themes</h2>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredThemes.map((theme) => {
+                  const isOwned = profile?.selected_theme_id === theme.id;
+                  const canAfford = profile ? profile.coins >= theme.coin_cost : false;
+                  const isPurchasing = purchasingItemId === theme.id;
 
-                return (
-                  <div
-                    key={item.id}
-                    className={`bg-background rounded-xl border-2 overflow-hidden transition-all ${
-                      isOwned
-                        ? "border-green-500"
-                        : meetsLevel && canAfford
-                        ? "border-border hover:border-primary hover:shadow-xl"
-                        : "border-muted opacity-75"
-                    }`}
-                  >
-                    {/* Item Icon */}
-                    <div className={`h-32 flex items-center justify-center text-6xl ${
-                      isOwned ? "bg-green-50 dark:bg-green-950/20" : "bg-muted"
-                    }`}>
-                      {item.icon}
-                    </div>
+                  return (
+                    <div
+                      key={theme.id}
+                      className={`bg-background rounded-xl border-2 overflow-hidden transition-all ${
+                        isOwned
+                          ? "border-green-500"
+                          : canAfford
+                          ? "border-border hover:border-primary hover:shadow-xl"
+                          : "border-muted opacity-75"
+                      }`}
+                    >
+                      {/* Theme Preview */}
+                      <div className="h-24 flex">
+                        <div
+                          className="flex-1"
+                          style={{ backgroundColor: theme.preview_colors.primary }}
+                        />
+                        <div
+                          className="flex-1"
+                          style={{ backgroundColor: theme.preview_colors.secondary }}
+                        />
+                        <div
+                          className="flex-1"
+                          style={{ backgroundColor: theme.preview_colors.background }}
+                        />
+                      </div>
 
-                    {/* Item Details */}
-                    <div className="p-4">
-                      <div className="flex items-start justify-between mb-2">
-                        <h3 className="font-bold text-lg">{item.name}</h3>
-                        {isOwned && (
-                          <Check className="w-5 h-5 text-green-500 flex-shrink-0" />
+                      {/* Theme Details */}
+                      <div className="p-4">
+                        <div className="flex items-start justify-between mb-2">
+                          <h3 className="font-bold text-lg">{theme.name}</h3>
+                          {isOwned && <Check className="w-5 h-5 text-green-500 flex-shrink-0" />}
+                        </div>
+
+                        <p className="text-sm text-muted-foreground mb-4">
+                          {theme.description}
+                        </p>
+
+                        {/* Price */}
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2 text-yellow-600 font-bold">
+                            <Coins className="w-4 h-4" />
+                            <span>{theme.coin_cost === 0 ? "Free" : theme.coin_cost}</span>
+                          </div>
+                          {theme.is_premium && (
+                            <span className="text-xs bg-gradient-to-r from-yellow-400 to-yellow-600 text-white px-2 py-0.5 rounded-full">
+                              Premium
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Purchase Button */}
+                        {isOwned ? (
+                          <button
+                            disabled
+                            className="w-full py-2 rounded-lg bg-green-500 text-white font-semibold flex items-center justify-center gap-2"
+                          >
+                            <Check className="w-4 h-4" />
+                            Equipped
+                          </button>
+                        ) : !user ? (
+                          <button
+                            onClick={() => window.location.href = "/login"}
+                            className="w-full py-2 rounded-lg bg-muted text-muted-foreground font-semibold"
+                          >
+                            Log in to purchase
+                          </button>
+                        ) : !canAfford ? (
+                          <button
+                            disabled
+                            className="w-full py-2 rounded-lg bg-muted text-muted-foreground font-semibold"
+                          >
+                            Not Enough Coins
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => purchaseTheme(theme)}
+                            disabled={isPurchasing}
+                            className="w-full py-2 rounded-lg bg-gradient-to-r from-primary to-secondary text-white font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+                          >
+                            <Sparkles className="w-4 h-4" />
+                            {isPurchasing ? "Purchasing..." : "Purchase"}
+                          </button>
                         )}
                       </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
-                      <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-                        {item.description}
-                      </p>
+          {/* Avatars Section */}
+          {filteredAvatars.length > 0 && (
+            <div>
+              <div className="flex items-center gap-3 mb-6">
+                <Smile className="w-6 h-6 text-primary" />
+                <h2 className="text-2xl font-bold">Avatars</h2>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                {filteredAvatars.map((avatar) => {
+                  const isOwned = profile?.selected_avatar_id === avatar.id;
+                  const canAfford = profile ? profile.coins >= avatar.coin_cost : false;
+                  const isPurchasing = purchasingItemId === avatar.id;
 
-                      {/* Category Badge */}
+                  return (
+                    <div
+                      key={avatar.id}
+                      className={`bg-background rounded-xl border-2 p-4 transition-all text-center ${
+                        isOwned
+                          ? "border-green-500"
+                          : canAfford
+                          ? "border-border hover:border-primary hover:shadow-xl"
+                          : "border-muted opacity-75"
+                      }`}
+                    >
+                      {/* Avatar Emoji */}
+                      <div className="text-5xl mb-2">{avatar.emoji}</div>
+
+                      {/* Avatar Name */}
+                      <h3 className="font-bold text-sm mb-2">{avatar.name}</h3>
+
+                      {/* Price and Status */}
                       <div className="mb-3">
-                        <span className="inline-block px-3 py-1 bg-muted rounded-full text-xs font-medium capitalize">
-                          {item.category}
-                        </span>
-                      </div>
-
-                      {/* Price and Requirements */}
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2 text-yellow-600 font-bold">
-                          <Coins className="w-4 h-4" />
-                          <span>{item.price}</span>
-                        </div>
-                        {item.required_level > 1 && (
-                          <div className={`text-xs ${
-                            meetsLevel ? "text-muted-foreground" : "text-red-500"
-                          }`}>
-                            Level {item.required_level}+
+                        {isOwned ? (
+                          <div className="flex items-center justify-center gap-1 text-green-500 text-sm">
+                            <Check className="w-4 h-4" />
+                            Equipped
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center gap-1 text-yellow-600 text-sm font-bold">
+                            <Coins className="w-3 h-3" />
+                            <span>{avatar.coin_cost === 0 ? "Free" : avatar.coin_cost}</span>
                           </div>
                         )}
                       </div>
 
                       {/* Purchase Button */}
-                      {isOwned ? (
+                      {!isOwned && user && (
                         <button
-                          disabled
-                          className="w-full py-2 rounded-lg bg-green-500 text-white font-semibold flex items-center justify-center gap-2"
+                          onClick={() => purchaseAvatar(avatar)}
+                          disabled={isPurchasing || !canAfford}
+                          className={`w-full py-1.5 rounded-lg text-xs font-semibold transition-opacity ${
+                            canAfford
+                              ? "bg-gradient-to-r from-primary to-secondary text-white hover:opacity-90"
+                              : "bg-muted text-muted-foreground cursor-not-allowed"
+                          }`}
                         >
-                          <Check className="w-4 h-4" />
-                          Owned
+                          {isPurchasing ? "..." : canAfford ? "Buy" : "Locked"}
                         </button>
-                      ) : !user ? (
+                      )}
+                      {!isOwned && !user && (
                         <button
                           onClick={() => window.location.href = "/login"}
-                          className="w-full py-2 rounded-lg bg-muted text-muted-foreground font-semibold"
+                          className="w-full py-1.5 rounded-lg text-xs bg-muted text-muted-foreground font-semibold"
                         >
-                          Log in to purchase
-                        </button>
-                      ) : !meetsLevel ? (
-                        <button
-                          disabled
-                          className="w-full py-2 rounded-lg bg-muted text-muted-foreground font-semibold flex items-center justify-center gap-2"
-                        >
-                          <Lock className="w-4 h-4" />
-                          Level {item.required_level} Required
-                        </button>
-                      ) : !canAfford ? (
-                        <button
-                          disabled
-                          className="w-full py-2 rounded-lg bg-muted text-muted-foreground font-semibold"
-                        >
-                          Not Enough Coins
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => purchaseItem(item)}
-                          disabled={isPurchasing}
-                          className="w-full py-2 rounded-lg bg-gradient-to-r from-primary to-secondary text-white font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
-                        >
-                          <Sparkles className="w-4 h-4" />
-                          {isPurchasing ? "Purchasing..." : "Purchase"}
+                          Login
                         </button>
                       )}
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Empty State */}
+          {filteredThemes.length === 0 && filteredAvatars.length === 0 && (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground text-lg">No items in this category yet.</p>
             </div>
           )}
         </div>

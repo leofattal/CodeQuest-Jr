@@ -19,6 +19,13 @@ interface World {
   unlock_requirement: string | null;
 }
 
+interface WorldProgress {
+  world_id: string;
+  completed_lessons: number;
+  total_lessons: number;
+  completion_percentage: number;
+}
+
 /**
  * Worlds Page
  * Displays all coding worlds with their unlock status
@@ -26,6 +33,7 @@ interface World {
 export default function WorldsPage() {
   const { user, profile } = useAuth();
   const [worlds, setWorlds] = useState<World[]>([]);
+  const [worldProgress, setWorldProgress] = useState<Map<string, WorldProgress>>(new Map());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -43,6 +51,43 @@ export default function WorldsPage() {
         }
 
         setWorlds(data || []);
+
+        // Fetch progress for each world if user is logged in
+        if (user && data) {
+          const progressMap = new Map<string, WorldProgress>();
+
+          for (const world of data) {
+            // Get total lessons for this world
+            const { data: lessonsData } = await supabase
+              .from("lessons")
+              .select("id")
+              .eq("world_id", world.id);
+
+            const totalLessons = lessonsData?.length || 0;
+
+            // Get completed lessons for this world
+            const { data: progressData } = await supabase
+              .from("student_progress")
+              .select("lesson_id")
+              .eq("student_id", user.id)
+              .eq("world_id", world.id)
+              .eq("completed", true);
+
+            const completedLessons = progressData?.length || 0;
+            const completionPercentage = totalLessons > 0
+              ? Math.round((completedLessons / totalLessons) * 100)
+              : 0;
+
+            progressMap.set(world.id, {
+              world_id: world.id,
+              completed_lessons: completedLessons,
+              total_lessons: totalLessons,
+              completion_percentage: completionPercentage,
+            });
+          }
+
+          setWorldProgress(progressMap);
+        }
       } catch (error) {
         console.error("Error fetching worlds:", error);
       } finally {
@@ -51,7 +96,7 @@ export default function WorldsPage() {
     }
 
     fetchWorlds();
-  }, []);
+  }, [user]);
 
   if (loading) {
     return (
@@ -83,6 +128,7 @@ export default function WorldsPage() {
               <WorldCard
                 key={world.id}
                 world={world}
+                progress={worldProgress.get(world.id)}
               />
             ))}
           </div>
@@ -120,11 +166,15 @@ export default function WorldsPage() {
   );
 }
 
-function WorldCard({ world }: { world: World }) {
+function WorldCard({ world, progress }: { world: World; progress?: WorldProgress }) {
   // Parse color for gradient
   const gradientClass = world.color.includes("from-")
     ? world.color
     : `from-${world.color}-500 to-${world.color}-600`;
+
+  const completionPercentage = progress?.completion_percentage || 0;
+  const completedLessons = progress?.completed_lessons || 0;
+  const totalLessons = progress?.total_lessons || 0;
 
   return (
     <Link
@@ -164,18 +214,23 @@ function WorldCard({ world }: { world: World }) {
           {world.description}
         </p>
 
-        {/* Progress Bar (placeholder) */}
+        {/* Progress Bar */}
         <div className="mb-4">
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
             <span>Progress</span>
-            <span>0%</span>
+            <span>{completionPercentage}%</span>
           </div>
           <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
             <div
-              className={`h-full bg-gradient-to-r ${gradientClass}`}
-              style={{ width: "0%" }}
+              className={`h-full bg-gradient-to-r ${gradientClass} transition-all duration-500`}
+              style={{ width: `${completionPercentage}%` }}
             />
           </div>
+          {totalLessons > 0 && (
+            <p className="text-xs text-muted-foreground mt-1">
+              {completedLessons} of {totalLessons} lessons completed
+            </p>
+          )}
         </div>
 
         {/* Action */}
