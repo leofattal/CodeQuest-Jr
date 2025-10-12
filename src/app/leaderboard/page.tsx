@@ -130,10 +130,6 @@ export default function LeaderboardPage() {
                 xp: stats.xp,
               };
             })
-            .filter((student) => {
-              // Filter out students with no activity in the time period
-              return sortBy === "current_streak" || sortBy === "level" || student[sortBy] > 0;
-            })
             .sort((a, b) => {
               const aValue = a[sortBy] || 0;
               const bValue = b[sortBy] || 0;
@@ -169,6 +165,7 @@ export default function LeaderboardPage() {
           rank: index + 1,
         }));
 
+        console.log('Leaderboard data:', rankedData);
         setLeaders(rankedData);
 
         // Fetch global stats
@@ -462,9 +459,9 @@ export default function LeaderboardPage() {
             </div>
           )}
 
-          {/* Rankings List (4-100) */}
+          {/* Rankings List (4-100 or all if less than 3) */}
           <div className="space-y-3">
-            {leaders.slice(3).map((entry) => {
+            {(leaders.length < 3 ? leaders : leaders.slice(3)).map((entry) => {
               const rankIcon = getRankIcon(entry.rank!);
               const isCurrentUser = user?.id === entry.id;
 
@@ -569,9 +566,20 @@ export default function LeaderboardPage() {
             })}
           </div>
 
-          {leaders.length === 0 && (
+          {leaders.length === 0 && !loading && (
+            <div className="text-center py-12 bg-muted/20 rounded-xl border border-border">
+              <Trophy className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-50" />
+              <p className="text-muted-foreground text-lg mb-2">No students found</p>
+              <p className="text-sm text-muted-foreground">
+                Be the first to complete lessons and climb the leaderboard!
+              </p>
+            </div>
+          )}
+
+          {loading && leaders.length === 0 && (
             <div className="text-center py-12">
-              <p className="text-muted-foreground text-lg">No rankings available yet.</p>
+              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+              <p className="text-muted-foreground mt-4">Loading leaderboard...</p>
             </div>
           )}
         </div>
