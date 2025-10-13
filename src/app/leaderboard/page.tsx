@@ -27,7 +27,7 @@ interface Badge {
 
 interface StudentBadge {
   badge_id: string;
-  badges: Badge;
+  badges: Badge | Badge[] | null;
 }
 
 interface LeaderboardEntry {
@@ -290,6 +290,14 @@ export default function LeaderboardPage() {
     return { icon: rank.toString(), color: "text-muted-foreground" };
   };
 
+  const getBadge = (studentBadge: StudentBadge): Badge | null => {
+    if (!studentBadge.badges) return null;
+    if (Array.isArray(studentBadge.badges)) {
+      return studentBadge.badges[0] || null;
+    }
+    return studentBadge.badges;
+  };
+
   const getStatValue = (entry: LeaderboardEntry) => {
     switch (sortBy) {
       case "xp":
@@ -465,11 +473,15 @@ export default function LeaderboardPage() {
                   <div className="text-sm text-gray-700 mb-2">{getStatValue(leaders[1])}</div>
                   {leaders[1]?.badges && leaders[1].badges.length > 0 && (
                     <div className="flex items-center justify-center gap-1 flex-wrap">
-                      {leaders[1].badges.slice(0, 3).map((studentBadge) => (
-                        <span key={studentBadge.badge_id} className="text-lg" title={studentBadge.badges.name}>
-                          {studentBadge.badges.emoji}
-                        </span>
-                      ))}
+                      {leaders[1].badges.slice(0, 3).map((studentBadge) => {
+                        const badge = getBadge(studentBadge);
+                        if (!badge) return null;
+                        return (
+                          <span key={studentBadge.badge_id} className="text-lg" title={badge.name}>
+                            {badge.emoji}
+                          </span>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -492,11 +504,15 @@ export default function LeaderboardPage() {
                   <div className="text-sm text-gray-700 mb-2">{getStatValue(leaders[0])}</div>
                   {leaders[0]?.badges && leaders[0].badges.length > 0 && (
                     <div className="flex items-center justify-center gap-1 flex-wrap">
-                      {leaders[0].badges.slice(0, 3).map((studentBadge) => (
-                        <span key={studentBadge.badge_id} className="text-xl" title={studentBadge.badges.name}>
-                          {studentBadge.badges.emoji}
-                        </span>
-                      ))}
+                      {leaders[0].badges.slice(0, 3).map((studentBadge) => {
+                        const badge = getBadge(studentBadge);
+                        if (!badge) return null;
+                        return (
+                          <span key={studentBadge.badge_id} className="text-xl" title={badge.name}>
+                            {badge.emoji}
+                          </span>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -519,11 +535,15 @@ export default function LeaderboardPage() {
                   <div className="text-sm text-amber-100 mb-2">{getStatValue(leaders[2])}</div>
                   {leaders[2]?.badges && leaders[2].badges.length > 0 && (
                     <div className="flex items-center justify-center gap-1 flex-wrap">
-                      {leaders[2].badges.slice(0, 3).map((studentBadge) => (
-                        <span key={studentBadge.badge_id} className="text-lg" title={studentBadge.badges.name}>
-                          {studentBadge.badges.emoji}
-                        </span>
-                      ))}
+                      {leaders[2].badges.slice(0, 3).map((studentBadge) => {
+                        const badge = getBadge(studentBadge);
+                        if (!badge) return null;
+                        return (
+                          <span key={studentBadge.badge_id} className="text-lg" title={badge.name}>
+                            {badge.emoji}
+                          </span>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -588,16 +608,20 @@ export default function LeaderboardPage() {
                           {/* Badges */}
                           {entry.badges && entry.badges.length > 0 && (
                             <div className="flex items-center gap-1 flex-wrap mt-1">
-                              {entry.badges.slice(0, 5).map((studentBadge) => (
-                                <div
-                                  key={studentBadge.badge_id}
-                                  className="inline-flex items-center gap-1 px-2 py-0.5 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 rounded-full text-xs"
-                                  title={studentBadge.badges.description}
-                                >
-                                  <span>{studentBadge.badges.emoji}</span>
-                                  <span className="font-medium text-yellow-600">{studentBadge.badges.name}</span>
-                                </div>
-                              ))}
+                              {entry.badges.slice(0, 5).map((studentBadge) => {
+                                const badge = getBadge(studentBadge);
+                                if (!badge) return null;
+                                return (
+                                  <div
+                                    key={studentBadge.badge_id}
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 rounded-full text-xs"
+                                    title={badge.description}
+                                  >
+                                    <span>{badge.emoji}</span>
+                                    <span className="font-medium text-yellow-600">{badge.name}</span>
+                                  </div>
+                                );
+                              })}
                               {entry.badges.length > 5 && (
                                 <span className="text-xs text-muted-foreground">
                                   +{entry.badges.length - 5} more
