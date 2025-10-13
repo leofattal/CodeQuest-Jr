@@ -16,6 +16,20 @@ import {
   Target
 } from "lucide-react";
 
+interface Badge {
+  id: string;
+  name: string;
+  description: string;
+  emoji: string;
+  requirement_type: string;
+  requirement_value: number;
+}
+
+interface StudentBadge {
+  badge_id: string;
+  badges: Badge;
+}
+
 interface LeaderboardEntry {
   id: string;
   display_name: string;
@@ -26,6 +40,7 @@ interface LeaderboardEntry {
   current_streak: number | null;
   rank?: number;
   lessons_completed?: number;
+  badges?: StudentBadge[];
 }
 
 type SortBy = "xp" | "coins" | "level" | "current_streak";
@@ -83,11 +98,14 @@ export default function LeaderboardPage() {
         let error;
 
         if (timeFilter === "all_time") {
-          // Fetch all-time leaderboard
+          // Fetch all-time leaderboard with tie-breaking
           const result = await supabase
             .from("students")
             .select("id, display_name, avatar_url, coins, xp, level, current_streak")
             .order(sortBy, { ascending: false })
+            .order("xp", { ascending: false }) // Secondary sort by XP
+            .order("level", { ascending: false }) // Tertiary sort by level
+            .order("created_at", { ascending: true }) // Tie-breaker: oldest user wins
             .limit(100);
           data = result.data;
           error = result.error;
@@ -131,9 +149,19 @@ export default function LeaderboardPage() {
               };
             })
             .sort((a, b) => {
+              // Primary sort by selected metric
               const aValue = a[sortBy] || 0;
               const bValue = b[sortBy] || 0;
-              return bValue - aValue;
+              if (bValue !== aValue) return bValue - aValue;
+
+              // Tie-breaker 1: XP
+              if (b.xp !== a.xp) return b.xp - a.xp;
+
+              // Tie-breaker 2: Level
+              if (b.level !== a.level) return b.level - a.level;
+
+              // Tie-breaker 3: Coins
+              return b.coins - a.coins;
             })
             .slice(0, 100);
         }
@@ -143,7 +171,7 @@ export default function LeaderboardPage() {
           return;
         }
 
-        // Fetch lessons completed count for each student
+        // Fetch lessons completed count and badges for each student
         const studentsWithLessons = await Promise.all(
           (data || []).map(async (entry) => {
             const { count } = await supabase
@@ -152,9 +180,26 @@ export default function LeaderboardPage() {
               .eq("student_id", entry.id)
               .eq("completed", true);
 
+            // Fetch badges for this student
+            const { data: badgesData } = await supabase
+              .from("student_badges")
+              .select(`
+                badge_id,
+                badges (
+                  id,
+                  name,
+                  description,
+                  emoji,
+                  requirement_type,
+                  requirement_value
+                )
+              `)
+              .eq("student_id", entry.id);
+
             return {
               ...entry,
               lessons_completed: count || 0,
+              badges: badgesData || [],
             };
           })
         );
@@ -417,7 +462,16 @@ export default function LeaderboardPage() {
                     )}
                   </div>
                   <div className="font-bold mb-1 truncate">{leaders[1]?.display_name}</div>
-                  <div className="text-sm text-gray-700">{getStatValue(leaders[1])}</div>
+                  <div className="text-sm text-gray-700 mb-2">{getStatValue(leaders[1])}</div>
+                  {leaders[1]?.badges && leaders[1].badges.length > 0 && (
+                    <div className="flex items-center justify-center gap-1 flex-wrap">
+                      {leaders[1].badges.slice(0, 3).map((studentBadge) => (
+                        <span key={studentBadge.badge_id} className="text-lg" title={studentBadge.badges.name}>
+                          {studentBadge.badges.emoji}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -435,7 +489,16 @@ export default function LeaderboardPage() {
                     )}
                   </div>
                   <div className="font-bold text-lg mb-1 truncate">{leaders[0]?.display_name}</div>
-                  <div className="text-sm text-gray-700">{getStatValue(leaders[0])}</div>
+                  <div className="text-sm text-gray-700 mb-2">{getStatValue(leaders[0])}</div>
+                  {leaders[0]?.badges && leaders[0].badges.length > 0 && (
+                    <div className="flex items-center justify-center gap-1 flex-wrap">
+                      {leaders[0].badges.slice(0, 3).map((studentBadge) => (
+                        <span key={studentBadge.badge_id} className="text-xl" title={studentBadge.badges.name}>
+                          {studentBadge.badges.emoji}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -453,7 +516,16 @@ export default function LeaderboardPage() {
                     )}
                   </div>
                   <div className="font-bold mb-1 truncate">{leaders[2]?.display_name}</div>
-                  <div className="text-sm text-amber-100">{getStatValue(leaders[2])}</div>
+                  <div className="text-sm text-amber-100 mb-2">{getStatValue(leaders[2])}</div>
+                  {leaders[2]?.badges && leaders[2].badges.length > 0 && (
+                    <div className="flex items-center justify-center gap-1 flex-wrap">
+                      {leaders[2].badges.slice(0, 3).map((studentBadge) => (
+                        <span key={studentBadge.badge_id} className="text-lg" title={studentBadge.badges.name}>
+                          {studentBadge.badges.emoji}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -510,9 +582,29 @@ export default function LeaderboardPage() {
                               </span>
                             )}
                           </div>
-                          <div className="text-sm text-muted-foreground">
+                          <div className="text-sm text-muted-foreground mb-1">
                             Level {entry.level} • {entry.lessons_completed || 0} lessons completed
                           </div>
+                          {/* Badges */}
+                          {entry.badges && entry.badges.length > 0 && (
+                            <div className="flex items-center gap-1 flex-wrap mt-1">
+                              {entry.badges.slice(0, 5).map((studentBadge) => (
+                                <div
+                                  key={studentBadge.badge_id}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 rounded-full text-xs"
+                                  title={studentBadge.badges.description}
+                                >
+                                  <span>{studentBadge.badges.emoji}</span>
+                                  <span className="font-medium text-yellow-600">{studentBadge.badges.name}</span>
+                                </div>
+                              ))}
+                              {entry.badges.length > 5 && (
+                                <span className="text-xs text-muted-foreground">
+                                  +{entry.badges.length - 5} more
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
 
