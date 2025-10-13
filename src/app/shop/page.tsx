@@ -46,6 +46,8 @@ export default function ShopPage() {
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [purchasingItemId, setPurchasingItemId] = useState<string | null>(null);
+  const [purchasedThemeIds, setPurchasedThemeIds] = useState<Set<string>>(new Set());
+  const [purchasedAvatarIds, setPurchasedAvatarIds] = useState<Set<string>>(new Set());
 
   const categories = [
     { id: "all", name: "All Items", icon: "🛍️" },
@@ -81,6 +83,31 @@ export default function ShopPage() {
         } else {
           setAvatars(avatarsData || []);
         }
+
+        // Fetch purchased items for the current user
+        if (user) {
+          const { data: purchasesData, error: purchasesError } = await supabase
+            .from("student_purchases")
+            .select("theme_id, avatar_id")
+            .eq("student_id", user.id);
+
+          if (purchasesError) {
+            console.error("Error fetching purchases:", purchasesError);
+          } else if (purchasesData) {
+            const themeIds = new Set(
+              purchasesData
+                .filter((p) => p.theme_id)
+                .map((p) => p.theme_id!)
+            );
+            const avatarIds = new Set(
+              purchasesData
+                .filter((p) => p.avatar_id)
+                .map((p) => p.avatar_id!)
+            );
+            setPurchasedThemeIds(themeIds);
+            setPurchasedAvatarIds(avatarIds);
+          }
+        }
       } catch (error) {
         console.error("Error fetching shop data:", error);
       } finally {
@@ -102,7 +129,7 @@ export default function ShopPage() {
       return;
     }
 
-    if (profile.selected_theme_id === theme.id) {
+    if (purchasedThemeIds.has(theme.id)) {
       alert("You already own this theme!");
       return;
     }
@@ -113,7 +140,7 @@ export default function ShopPage() {
       const supabase = createClient();
 
       // Deduct coins and select theme
-      const { error } = await supabase
+      const { error: updateError } = await supabase
         .from("students")
         .update({
           coins: profile.coins - theme.coin_cost,
@@ -121,11 +148,28 @@ export default function ShopPage() {
         })
         .eq("id", user.id);
 
-      if (error) {
-        console.error("Error purchasing theme:", error);
+      if (updateError) {
+        console.error("Error purchasing theme:", updateError);
         alert("Purchase failed. Please try again.");
         return;
       }
+
+      // Record purchase in student_purchases table
+      const { error: insertError } = await supabase
+        .from("student_purchases")
+        .insert({
+          student_id: user.id,
+          theme_id: theme.id,
+          purchased_at: new Date().toISOString()
+        });
+
+      if (insertError) {
+        console.error("Error recording purchase:", insertError);
+        // Don't alert here since the main purchase succeeded
+      }
+
+      // Update local state
+      setPurchasedThemeIds(new Set([...purchasedThemeIds, theme.id]));
 
       alert(`${theme.name} purchased and equipped!`);
       await refreshProfile();
@@ -148,7 +192,7 @@ export default function ShopPage() {
       return;
     }
 
-    if (profile.selected_avatar_id === avatar.id) {
+    if (purchasedAvatarIds.has(avatar.id)) {
       alert("You already own this avatar!");
       return;
     }
@@ -159,7 +203,7 @@ export default function ShopPage() {
       const supabase = createClient();
 
       // Deduct coins and select avatar
-      const { error } = await supabase
+      const { error: updateError } = await supabase
         .from("students")
         .update({
           coins: profile.coins - avatar.coin_cost,
@@ -167,11 +211,28 @@ export default function ShopPage() {
         })
         .eq("id", user.id);
 
-      if (error) {
-        console.error("Error purchasing avatar:", error);
+      if (updateError) {
+        console.error("Error purchasing avatar:", updateError);
         alert("Purchase failed. Please try again.");
         return;
       }
+
+      // Record purchase in student_purchases table
+      const { error: insertError } = await supabase
+        .from("student_purchases")
+        .insert({
+          student_id: user.id,
+          avatar_id: avatar.id,
+          purchased_at: new Date().toISOString()
+        });
+
+      if (insertError) {
+        console.error("Error recording purchase:", insertError);
+        // Don't alert here since the main purchase succeeded
+      }
+
+      // Update local state
+      setPurchasedAvatarIds(new Set([...purchasedAvatarIds, avatar.id]));
 
       alert(`${avatar.name} purchased and equipped!`);
       await refreshProfile();
@@ -256,7 +317,8 @@ export default function ShopPage() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredThemes.map((theme) => {
-                  const isOwned = profile?.selected_theme_id === theme.id;
+                  const isPurchased = purchasedThemeIds.has(theme.id);
+                  const isEquipped = profile?.selected_theme_id === theme.id;
                   const canAfford = profile ? profile.coins >= theme.coin_cost : false;
                   const isPurchasing = purchasingItemId === theme.id;
 
@@ -264,8 +326,10 @@ export default function ShopPage() {
                     <div
                       key={theme.id}
                       className={`bg-background rounded-xl border-2 overflow-hidden transition-all ${
-                        isOwned
+                        isEquipped
                           ? "border-green-500"
+                          : isPurchased
+                          ? "border-blue-500"
                           : canAfford
                           ? "border-border hover:border-primary hover:shadow-xl"
                           : "border-muted opacity-75"
@@ -291,7 +355,8 @@ export default function ShopPage() {
                       <div className="p-4">
                         <div className="flex items-start justify-between mb-2">
                           <h3 className="font-bold text-lg">{theme.name}</h3>
-                          {isOwned && <Check className="w-5 h-5 text-green-500 flex-shrink-0" />}
+                          {isEquipped && <Check className="w-5 h-5 text-green-500 flex-shrink-0" />}
+                          {!isEquipped && isPurchased && <Check className="w-5 h-5 text-blue-500 flex-shrink-0" />}
                         </div>
 
                         <p className="text-sm text-muted-foreground mb-4">
@@ -312,13 +377,21 @@ export default function ShopPage() {
                         </div>
 
                         {/* Purchase Button */}
-                        {isOwned ? (
+                        {isEquipped ? (
                           <button
                             disabled
                             className="w-full py-2 rounded-lg bg-green-500 text-white font-semibold flex items-center justify-center gap-2"
                           >
                             <Check className="w-4 h-4" />
                             Equipped
+                          </button>
+                        ) : isPurchased ? (
+                          <button
+                            disabled
+                            className="w-full py-2 rounded-lg bg-blue-500 text-white font-semibold flex items-center justify-center gap-2"
+                          >
+                            <Check className="w-4 h-4" />
+                            Owned
                           </button>
                         ) : !user ? (
                           <button
@@ -361,7 +434,8 @@ export default function ShopPage() {
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
                 {filteredAvatars.map((avatar) => {
-                  const isOwned = profile?.selected_avatar_id === avatar.id;
+                  const isPurchased = purchasedAvatarIds.has(avatar.id);
+                  const isEquipped = profile?.selected_avatar_id === avatar.id;
                   const canAfford = profile ? profile.coins >= avatar.coin_cost : false;
                   const isPurchasing = purchasingItemId === avatar.id;
 
@@ -369,8 +443,10 @@ export default function ShopPage() {
                     <div
                       key={avatar.id}
                       className={`bg-background rounded-xl border-2 p-4 transition-all text-center ${
-                        isOwned
+                        isEquipped
                           ? "border-green-500"
+                          : isPurchased
+                          ? "border-blue-500"
                           : canAfford
                           ? "border-border hover:border-primary hover:shadow-xl"
                           : "border-muted opacity-75"
@@ -384,10 +460,15 @@ export default function ShopPage() {
 
                       {/* Price and Status */}
                       <div className="mb-3">
-                        {isOwned ? (
+                        {isEquipped ? (
                           <div className="flex items-center justify-center gap-1 text-green-500 text-sm">
                             <Check className="w-4 h-4" />
                             Equipped
+                          </div>
+                        ) : isPurchased ? (
+                          <div className="flex items-center justify-center gap-1 text-blue-500 text-sm">
+                            <Check className="w-4 h-4" />
+                            Owned
                           </div>
                         ) : (
                           <div className="flex items-center justify-center gap-1 text-yellow-600 text-sm font-bold">
@@ -398,7 +479,7 @@ export default function ShopPage() {
                       </div>
 
                       {/* Purchase Button */}
-                      {!isOwned && user && (
+                      {!isPurchased && user && (
                         <button
                           onClick={() => purchaseAvatar(avatar)}
                           disabled={isPurchasing || !canAfford}
@@ -411,7 +492,7 @@ export default function ShopPage() {
                           {isPurchasing ? "..." : canAfford ? "Buy" : "Locked"}
                         </button>
                       )}
-                      {!isOwned && !user && (
+                      {!isPurchased && !user && (
                         <button
                           onClick={() => window.location.href = "/login"}
                           className="w-full py-1.5 rounded-lg text-xs bg-muted text-muted-foreground font-semibold"
