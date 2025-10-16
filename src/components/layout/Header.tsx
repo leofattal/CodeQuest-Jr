@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Coins, User, Menu, X, LogOut, Trophy, Star } from "lucide-react";
+import { Coins, User, Menu, X, LogOut, Trophy, Star, Calendar } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
@@ -47,6 +47,13 @@ export function Header() {
               className="text-foreground hover:text-primary transition-colors font-medium"
             >
               Worlds
+            </Link>
+            <Link
+              href="/challenges"
+              className="text-foreground hover:text-primary transition-colors font-medium flex items-center gap-1"
+            >
+              <Calendar className="w-4 h-4" />
+              Daily
             </Link>
             <Link
               href="/shop"
@@ -197,6 +204,14 @@ export function Header() {
               onClick={() => setMobileMenuOpen(false)}
             >
               Worlds
+            </Link>
+            <Link
+              href="/challenges"
+              className="block px-2 py-2 rounded-lg hover:bg-muted transition-colors flex items-center gap-2"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <Calendar className="w-4 h-4" />
+              Daily Challenges
             </Link>
             <Link
               href="/shop"

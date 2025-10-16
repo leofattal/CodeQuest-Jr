@@ -44,6 +44,10 @@ interface Lesson {
     case_sensitive?: boolean;
   };
   hints: string[];
+  hint_1: string | null;
+  hint_2: string | null;
+  hint_3: string | null;
+  hint_cost_coins: number;
   coin_reward: number;
   xp_reward: number;
   estimated_minutes: number;
@@ -62,12 +66,14 @@ interface World {
  */
 export default function LessonPage() {
   const params = useParams();
-  const { user } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
   const [lesson, setLesson] = useState<Lesson | null>(null);
   const [world, setWorld] = useState<World | null>(null);
   const [loading, setLoading] = useState(true);
   const [code, setCode] = useState("");
   const [currentHintIndex, setCurrentHintIndex] = useState(-1);
+  const [unlockedHints, setUnlockedHints] = useState<number[]>([]); // hint levels unlocked (1, 2, 3)
+  const [purchasingHint, setPurchasingHint] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const [validationResult, setValidationResult] = useState<{
     success: boolean;
@@ -128,7 +134,7 @@ export default function LessonPage() {
           setWorld(worldData);
         }
 
-        // Check if user has completed this lesson
+        // Check if user has completed this lesson and fetch unlocked hints
         if (user) {
           const { data: progressData } = await supabase
             .from("student_progress")
@@ -142,6 +148,19 @@ export default function LessonPage() {
           } else {
             // Start timer if lesson is not completed
             setIsTimerRunning(true);
+          }
+
+          // Fetch unlocked hints
+          const { data: hintsData } = await supabase
+            .from("student_hints")
+            .select("hint_level")
+            .eq("student_id", user.id)
+            .eq("lesson_id", lessonId);
+
+          if (hintsData && hintsData.length > 0) {
+            const levels = hintsData.map(h => h.hint_level);
+            setUnlockedHints(levels);
+            setCurrentHintIndex(Math.max(...levels) - 1);
           }
         }
       } catch (error) {
@@ -619,9 +638,69 @@ export default function LessonPage() {
     }
   };
 
-  const showNextHint = () => {
-    if (lesson && currentHintIndex < lesson.hints.length - 1) {
+  const showNextHint = async () => {
+    if (!lesson || !user || !profile) return;
+
+    const nextHintLevel = currentHintIndex + 2; // hint levels are 1-indexed
+    if (nextHintLevel > 3) return; // Max 3 hints
+
+    // Check if user already unlocked this hint
+    if (unlockedHints.includes(nextHintLevel)) {
       setCurrentHintIndex(currentHintIndex + 1);
+      return;
+    }
+
+    const hintCost = lesson.hint_cost_coins || 5;
+
+    // Check if user has enough coins
+    if (profile.coins < hintCost) {
+      alert(`Not enough coins! You need ${hintCost} coins to unlock this hint.`);
+      return;
+    }
+
+    if (!confirm(`Unlock hint ${nextHintLevel} for ${hintCost} coins?`)) {
+      return;
+    }
+
+    setPurchasingHint(true);
+
+    try {
+      const supabase = createClient();
+
+      // Deduct coins
+      const { error: updateError } = await supabase
+        .from("students")
+        .update({ coins: profile.coins - hintCost })
+        .eq("id", user.id);
+
+      if (updateError) {
+        console.error("Error deducting coins:", updateError);
+        alert("Failed to unlock hint. Please try again.");
+        return;
+      }
+
+      // Record hint unlock
+      const { error: insertError } = await supabase
+        .from("student_hints")
+        .insert({
+          student_id: user.id,
+          lesson_id: lesson.id,
+          hint_level: nextHintLevel
+        });
+
+      if (insertError) {
+        console.error("Error recording hint unlock:", insertError);
+      }
+
+      // Update local state
+      setUnlockedHints([...unlockedHints, nextHintLevel]);
+      setCurrentHintIndex(currentHintIndex + 1);
+      await refreshProfile();
+    } catch (error) {
+      console.error("Error unlocking hint:", error);
+      alert("Failed to unlock hint. Please try again.");
+    } finally {
+      setPurchasingHint(false);
     }
   };
 
@@ -741,34 +820,54 @@ export default function LessonPage() {
               )}
 
               {/* Hints */}
-              {lesson.hints && lesson.hints.length > 0 && (
+              {(lesson.hint_1 || lesson.hint_2 || lesson.hint_3) && (
                 <div className="bg-amber-50 dark:bg-amber-950/20 rounded-xl p-6 border border-amber-200 dark:border-amber-800">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Lightbulb className="w-5 h-5 text-amber-600" />
-                    <h2 className="text-xl font-bold">Hints</h2>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Lightbulb className="w-5 h-5 text-amber-600" />
+                      <h2 className="text-xl font-bold">Hints</h2>
+                    </div>
+                    <div className="flex items-center gap-1 text-sm">
+                      <CoinsIcon className="w-4 h-4 text-yellow-600" />
+                      <span className="font-semibold text-yellow-700">{lesson.hint_cost_coins || 5} coins each</span>
+                    </div>
                   </div>
 
                   {currentHintIndex === -1 ? (
-                    <button
-                      onClick={showNextHint}
-                      className="text-amber-600 hover:text-amber-700 font-medium"
-                    >
-                      Show me a hint →
-                    </button>
-                  ) : (
-                    <div className="space-y-3">
-                      {lesson.hints.slice(0, currentHintIndex + 1).map((hint, index) => (
-                        <div key={index} className="flex items-start gap-2">
-                          <span className="text-amber-600 font-bold">{index + 1}.</span>
-                          <p className="text-muted-foreground">{hint}</p>
-                        </div>
-                      ))}
-                      {currentHintIndex < lesson.hints.length - 1 && (
+                    <div>
+                      <p className="text-muted-foreground mb-3 text-sm">Need help? Unlock hints to guide you through this lesson.</p>
+                      {user ? (
                         <button
                           onClick={showNextHint}
-                          className="text-amber-600 hover:text-amber-700 font-medium text-sm"
+                          disabled={purchasingHint}
+                          className="flex items-center gap-2 text-amber-600 hover:text-amber-700 font-medium disabled:opacity-50"
                         >
-                          Show another hint →
+                          <CoinsIcon className="w-4 h-4" />
+                          {purchasingHint ? "Unlocking..." : `Unlock first hint (${lesson.hint_cost_coins || 5} coins)`}
+                        </button>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">Log in to unlock hints</p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {[lesson.hint_1, lesson.hint_2, lesson.hint_3].map((hint, index) => {
+                        if (!hint || index > currentHintIndex) return null;
+                        return (
+                          <div key={index} className="flex items-start gap-2 p-3 bg-white dark:bg-background rounded-lg">
+                            <span className="text-amber-600 font-bold flex-shrink-0">{index + 1}.</span>
+                            <p className="text-foreground">{hint}</p>
+                          </div>
+                        );
+                      })}
+                      {currentHintIndex < 2 && [lesson.hint_1, lesson.hint_2, lesson.hint_3][currentHintIndex + 1] && (
+                        <button
+                          onClick={showNextHint}
+                          disabled={purchasingHint}
+                          className="flex items-center gap-2 text-amber-600 hover:text-amber-700 font-medium text-sm disabled:opacity-50"
+                        >
+                          <CoinsIcon className="w-4 h-4" />
+                          {purchasingHint ? "Unlocking..." : `Unlock next hint (${lesson.hint_cost_coins || 5} coins)`}
                         </button>
                       )}
                     </div>
